@@ -22,20 +22,7 @@ All dependencies for defining the environment are provided in `environment.yaml`
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) 
 
 ## Getting Started  
-Preprocess your own images. Please put the raw images in the `unprocessed` folder.
-```
-python align_face.py
-```
-
-Produce realistic results:
-```
-python main.py --im_path1 90.png --im_path2 15.png --im_path3 117.png --sign realistic --smooth 5
-```
-
-Produce results faithful to the masks:
-```
-python main.py --im_path1 90.png --im_path2 15.png --im_path3 117.png --sign fidelity --smooth 5
-```
+Preparing...
 
 ## Web UI
 
