@@ -26,7 +26,7 @@ Preparing...
 
 ## Web UI
 
-You can try out our online web demo at 
+You can try out our online web demo at http://223.194.45.72:3866/
 
 ## Acknowledgments
 This code borrows heavily from [BARBERSHOP](https://github.com/ZPdesu/Barbershop).
