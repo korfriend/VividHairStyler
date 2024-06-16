@@ -94,136 +94,6 @@ class Alignment():
     def setup_align_loss_builder(self):
         self.loss_builder = AlignLossBuilder(self.opts)
 
-    def create_target_segmentation_mask(self, img_path1, img_path2,generated_mask, sign, save_intermediate=True):
-
-        im1 = self.preprocess_img(img_path1)
-        down_seg1, _, _ = self.seg(im1)
-        seg_target1 = torch.argmax(down_seg1, dim=1).long()
-
-        ggg = torch.where(seg_target1 == 0, torch.zeros_like(seg_target1), torch.ones_like(seg_target1))
-
-
-        if generated_mask is not None:
-            hair_mask1 = torch.from_numpy(generated_mask).unsqueeze(0).unsqueeze(0).float()
-            hair_mask1 = F.interpolate(hair_mask1, size=seg_target1.shape[-2:], mode='nearest')
-            hair_mask1 = hair_mask1.squeeze(0)
-            seg_target1 = seg_target1[0].byte().cpu().detach()  # Move to the same device
-            seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)
-            
-            # Update target_mask with generated_mask
-            target_mask_from_generated = torch.where(hair_mask1 == 1, 10 * torch.ones_like(seg_target1), seg_target1)
-            seg_target1 = target_mask_from_generated
-
-        else :
-            hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))
-            seg_target1 = seg_target1[0].byte().cpu().detach()
-            seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)
-
-        im2 = self.preprocess_img(img_path2)
-        down_seg2, _, _ = self.seg(im2)
-        seg_target2 = torch.argmax(down_seg2, dim=1).long()
-
-        ggg = torch.where(seg_target2 == 10, torch.ones_like(seg_target2), ggg)
-
-        hair_mask2 = torch.where(seg_target2 == 10, torch.ones_like(seg_target2), torch.zeros_like(seg_target2))
-        seg_target2 = seg_target2[0].byte().cpu().detach()
-
-
-        OB_region = torch.where(
-            (seg_target2 != 10) * (seg_target2 != 0) * (seg_target2 != 15) * (
-                    seg_target1 == 0),
-            255 * torch.ones_like(seg_target1), torch.zeros_like(seg_target1))
-
-
-        new_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(seg_target1), seg_target1)
-
-        inpainting_region = torch.where((new_target != 0) * (new_target != 10), 255 * torch.ones_like(new_target),
-                                        OB_region).numpy()
-        tmp = torch.where(torch.from_numpy(inpainting_region) == 255, torch.zeros_like(new_target), new_target) / 10
-        new_target_inpainted = (
-                    cv2.inpaint(tmp.clone().numpy(), inpainting_region, 3, cv2.INPAINT_NS).astype(np.uint8) * 10)
-        new_target_final = torch.where(OB_region, torch.from_numpy(new_target_inpainted), new_target)
-        # new_target_final = new_target
-        target_mask = new_target_final.unsqueeze(0).long().cuda()
-
-
-
-        ############################# add auto-inpainting
-
-
-        optimizer_align, latent_align = self.setup_align_optimizer()
-        latent_end = latent_align[:, 6:, :].clone().detach()
-
-        pbar = tqdm(range(80), desc='Create Target Mask Step1', leave=False)
-        for step in pbar:
-            optimizer_align.zero_grad()
-            latent_in = torch.cat([latent_align[:, :6, :], latent_end], dim=1)
-            down_seg, _ = self.create_down_seg(latent_in)
-
-            loss_dict = {}
-
-            if sign == 'realistic':
-                ce_loss = self.loss_builder.cross_entropy_loss_wo_background(down_seg, target_mask)
-                ce_loss += self.loss_builder.cross_entropy_loss_only_background(down_seg, ggg)
-            else:
-                ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask)
-
-
-            loss_dict["ce_loss"] = ce_loss.item()
-            loss = ce_loss
-
-
-            loss.backward()
-            optimizer_align.step()
-
-
-        gen_seg_target = torch.argmax(down_seg, dim=1).long()
-        free_mask = hair_mask1 * (1 - hair_mask2)
-        target_mask = torch.where(free_mask==1, gen_seg_target, target_mask)
-        previouse_target_mask = target_mask.clone().detach()
-
-        ############################################
-
-        target_mask = torch.where(OB_region.to(self.device).unsqueeze(0), torch.zeros_like(target_mask), target_mask)
-        optimizer_align, latent_align = self.setup_align_optimizer()
-        latent_end = latent_align[:, 6:, :].clone().detach()
-
-        pbar = tqdm(range(80), desc='Create Target Mask Step2', leave=False)
-        for step in pbar:
-            optimizer_align.zero_grad()
-            latent_in = torch.cat([latent_align[:, :6, :], latent_end], dim=1)
-            down_seg, _ = self.create_down_seg(latent_in)
-
-            loss_dict = {}
-
-            if sign == 'realistic':
-                ce_loss = self.loss_builder.cross_entropy_loss_wo_background(down_seg, target_mask)
-                ce_loss += self.loss_builder.cross_entropy_loss_only_background(down_seg, ggg)
-            else:
-                ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask)
-
-            loss_dict["ce_loss"] = ce_loss.item()
-            loss = ce_loss
-
-            loss.backward()
-            optimizer_align.step()
-
-
-        gen_seg_target = torch.argmax(down_seg, dim=1).long()
-        # free_mask = hair_mask1 * (1 - hair_mask2)
-        # target_mask = torch.where((free_mask == 1) * (gen_seg_target!=0), gen_seg_target, previouse_target_mask)
-        target_mask = torch.where((OB_region.to(self.device).unsqueeze(0)) * (gen_seg_target != 0), gen_seg_target, previouse_target_mask)
-
-        #####################  Save Visualization of Target Segmentation Mask
-        # if save_intermediate:
-        #     save_vis_mask(img_path1, img_path2, sign, self.opts.output_dir, target_mask.squeeze().cpu())
-
-        hair_mask_target = torch.where(target_mask == 10, torch.ones_like(target_mask), torch.zeros_like(target_mask))
-        hair_mask_target = F.interpolate(hair_mask_target.float().unsqueeze(0), size=(512, 512), mode='nearest')
-
-        return target_mask, hair_mask_target, hair_mask1, hair_mask2
-
-
     def preprocess_img(self, img_path):
         im = load_image(img_path)
         im = torchvision.transforms.ToTensor()(im)[:3].unsqueeze(0).to(self.device)
@@ -240,9 +110,6 @@ class Alignment():
             # latent_W = torch.from_numpy(convert_npy_code(np.load(latent_path))).to(self.device).requires_grad_(True)
             else:
                 latent_W = load_latent_W(latent_path, device=self.device, allow_pickle=True).requires_grad_(True)
-            
-
-
 
         opt_dict = {
             'sgd': torch.optim.SGD,
@@ -265,8 +132,6 @@ class Alignment():
         hair_mask_erode = np.expand_dims(hair_mask_erode, axis=0)
 
         return torch.from_numpy(hair_mask_dilate).float(), torch.from_numpy(hair_mask_erode).float()
-
-
 
     def create_down_seg(self, latent_in, is_downsampled=True):
         gen_im, _ = self.generator([latent_in], input_is_latent=True, return_latents=False,
@@ -301,148 +166,6 @@ class Alignment():
         free_mask_D, free_mask_E = self.cuda_unsqueeze(self.dilate_erosion_mask_tensor(free_mask, dilate_erosion=dilate_erosion), device)
         return free_mask_D, free_mask_E
 
-    def align_images(self, img_path1, img_path2, FS_dir, W_dir, BaldFS_dir, Bald_dir, save_dir, sign='realistic', align_more_region=False, smooth=5,
-                     save_intermediate=True):
-
-        ################## img_path1: Identity Image
-        ################## img_path2: Structure Image
-
-        device = self.device
-        target_mask, hair_mask_target, hair_mask1, hair_mask2 = \
-            self.create_target_segmentation_mask(img_path1=img_path1, img_path2=img_path2,generated_mask=None,sign=sign,
-                                                 save_intermediate=save_intermediate)
-
-        im_name_1 = os.path.splitext(os.path.basename(img_path1))[0]
-        im_name_2 = os.path.splitext(os.path.basename(img_path2))[0]
-
-        latent_FS_path_1 = os.path.join(FS_dir, f'{im_name_1}.npz')
-        latent_FS_path_2 = os.path.join(FS_dir, f'{im_name_2}.npz')
-
-        latent_1, latent_F_1 = load_FS_latent(latent_FS_path_1, device)
-        latent_2, latent_F_2 = load_FS_latent(latent_FS_path_2, device)
-
-        latent_W_path_1 = os.path.join(W_dir, f'{im_name_1}.npy')
-        latent_W_path_2 = os.path.join(W_dir, f'{im_name_2}.npy')
-
-        optimizer_align, latent_align_1 = self.setup_align_optimizer(latent_W_path_1)
-
-        pbar = tqdm(range(self.opts.align_steps1), desc='Align Step 1', leave=False)
-        for step in pbar:
-            optimizer_align.zero_grad()
-            latent_in = torch.cat([latent_align_1[:, :6, :], latent_1[:, 6:, :]], dim=1)
-            down_seg, _ = self.create_down_seg(latent_in)
-
-            loss_dict = {}
-            ##### Cross Entropy Loss
-            ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask)
-            loss_dict["ce_loss"] = ce_loss.item()
-            loss = ce_loss
-
-            # best_summary = f'BEST ({j+1}) | ' + ' | '.join(
-            #     [f'{x}: {y:.4f}' for x, y in loss_dict.items()])
-
-            #### TODO not finished
-
-            loss.backward()
-            optimizer_align.step()
-
-        intermediate_align, _ = self.generator([latent_in], input_is_latent=True, return_latents=False,
-                                                   start_layer=0, end_layer=3)
-        intermediate_align = intermediate_align.clone().detach()
-
-        ##############################################
-
-        optimizer_align, latent_align_2 = self.setup_align_optimizer(latent_W_path_2)
-
-        with torch.no_grad():
-            tmp_latent_in = torch.cat([latent_align_2[:, :6, :], latent_2[:, 6:, :]], dim=1)
-            down_seg_tmp, I_Structure_Style_changed = self.create_down_seg(tmp_latent_in)
-
-            current_mask_tmp = torch.argmax(down_seg_tmp, dim=1).long()
-            HM_Structure = torch.where(current_mask_tmp == 10, torch.ones_like(current_mask_tmp),
-                                       torch.zeros_like(current_mask_tmp))
-            HM_Structure = F.interpolate(HM_Structure.float().unsqueeze(0), size=(256, 256), mode='nearest')
-
-        pbar = tqdm(range(self.opts.align_steps2), desc='Align Step 2', leave=False)
-        for step in pbar:
-            optimizer_align.zero_grad()
-            latent_in = torch.cat([latent_align_2[:, :6, :], latent_2[:, 6:, :]], dim=1)
-            down_seg, gen_im = self.create_down_seg(latent_in)
-
-            Current_Mask = torch.argmax(down_seg, dim=1).long()
-            HM_G_512 = torch.where(Current_Mask == 10, torch.ones_like(Current_Mask),
-                                   torch.zeros_like(Current_Mask)).float().unsqueeze(0)
-            HM_G = F.interpolate(HM_G_512, size=(256, 256), mode='nearest')
-
-            loss_dict = {}
-
-            ########## Segmentation Loss
-            ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask)
-            loss_dict["ce_loss"] = ce_loss.item()
-            loss = ce_loss
-
-            #### Style Loss
-            H1_region = self.downsample_256(I_Structure_Style_changed) * HM_Structure
-            H2_region = self.downsample_256(gen_im) * HM_G
-            style_loss = self.loss_builder.style_loss(H1_region, H2_region, mask1=HM_Structure, mask2=HM_G)
-
-            loss_dict["style_loss"] = style_loss.item()
-            loss += style_loss
-
-            # best_summary = f'BEST ({j+1}) | ' + ' | '.join(
-            #     [f'{x}: {y:.4f}' for x, y in loss_dict.items()])
-
-            loss.backward()
-            optimizer_align.step()
-
-        latent_F_out_new, _ = self.generator([latent_in], input_is_latent=True, return_latents=False,
-                                                 start_layer=0, end_layer=3)
-        latent_F_out_new = latent_F_out_new.clone().detach()
-
-        free_mask = 1 - (1 - hair_mask1.unsqueeze(0)) * (1 - hair_mask_target)
-
-        ##############################
-        free_mask, _ = self.dilate_erosion(free_mask, device, dilate_erosion=smooth)
-        ##############################
-
-        free_mask_down_32 = F.interpolate(free_mask.float(), size=(32, 32), mode='bicubic')[0]
-        interpolation_low = 1 - free_mask_down_32
-
-
-        latent_F_mixed = intermediate_align + interpolation_low.unsqueeze(0) * (
-                latent_F_1 - intermediate_align)
-
-        if not align_more_region:
-            free_mask = hair_mask_target
-            ##########################
-            _, free_mask = self.dilate_erosion(free_mask, device, dilate_erosion=smooth)
-            ##########################
-            free_mask_down_32 = F.interpolate(free_mask.float(), size=(32, 32), mode='bicubic')[0]
-            interpolation_low = 1 - free_mask_down_32
-
-
-        latent_F_mixed = latent_F_out_new + interpolation_low.unsqueeze(0) * (
-                latent_F_mixed - latent_F_out_new)
-
-        free_mask = F.interpolate((hair_mask2.unsqueeze(0) * hair_mask_target).float(), size=(256, 256), mode='nearest').cuda()
-        ##########################
-        _, free_mask = self.dilate_erosion(free_mask, device, dilate_erosion=smooth)
-        ##########################
-        free_mask_down_32 = F.interpolate(free_mask.float(), size=(32, 32), mode='bicubic')[0]
-        interpolation_low = 1 - free_mask_down_32
-
-        latent_F_mixed = latent_F_2 + interpolation_low.unsqueeze(0) * (
-                latent_F_mixed - latent_F_2)
-
-        gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
-                                       end_layer=8, layer_in=latent_F_mixed)
-        self.save_align_results(im_name_1, im_name_2, sign, gen_im, latent_1, latent_F_mixed, save_dir,
-                                save_intermediate=save_intermediate)
-        self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(), self.save_dir, count='align_1_3')
-        
-        return gen_im, latent_F_mixed, HM_G_512
-
-
     def save_align_results(self, im_name_1, im_name_2, sign, gen_im, latent_in, latent_F, save_dir, save_intermediate=True):
 
         save_im = toPIL(((gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
@@ -458,86 +181,6 @@ class Alignment():
 
         np.save(W_latent_path, latent_in.detach().cpu().numpy())
         np.savez(FS_latent_path , latent_in=latent_in.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
-
-    def create_target_segmentation_mask_test(
-            self, 
-            img_path1, 
-            img_path2, 
-            sign, 
-            save_intermediate=True, 
-            is_downsampled=True, 
-            generated_mask=None, 
-            user_mask = None, 
-            user_sketch = False, 
-            pbar = None):
-        im1 = self.preprocess_img(img_path1)
-        down_seg, _, _ = self.seg(im1)
-        seg_target1 = torch.argmax(down_seg, dim=1).long()
-
-        im2 = self.preprocess_img(img_path2)
-        down_seg2, _, _ = self.seg(im2)
-        seg_target2 = torch.argmax(down_seg2, dim=1).long()
-        seg_target2_temp = seg_target2.clone()
-
-        hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
-        seg_target1 = seg_target1[0].byte().cpu().detach()
-        seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap
-        if self.opts.optimize_warped_trg_mask:
-            im1_for_kp = F.interpolate(im1, size=(256, 256))
-            im1_for_kp = ((im1_for_kp + 1) / 2).clamp(0, 1)  # [0, 1] 사이로
-            src_kp_hm = self.kp_extractor.face_alignment_net(im1_for_kp)
-            im2, warped_latent_2, _ = self.warp_target(img_path2, src_kp_hm, img_path1, generated_mask)  # Warping !!
-            save_im = toPIL(((im2 + 1) / 2).clamp(0, 1).squeeze().cpu())
-            save_im.save(os.path.join(self.opts.save_dir, '5_Aligned_src_img.png'))
-            warped_down_seg, im2 = self.create_down_seg(warped_latent_2, is_downsampled=is_downsampled)
-            if is_downsampled == False:
-                warped_seg = F.interpolate(warped_down_seg, size=(self.opts.size, self.opts.size))
-                seg_target2 = torch.argmax(warped_seg, dim=1).long()  # todo : debug for k,  512 or 256
-            else:
-                seg_target2 = torch.argmax(warped_down_seg, dim=1).long()
-            warped_down_seg = torch.argmax(warped_down_seg.clone().detach(), dim=1).long()  # 512, 512
-        # return hair_mask1, seg_target1, seg_target2, warped_down_seg, seg_target1
-
-        hair_mask2 = torch.where(seg_target2 == 10, torch.ones_like(seg_target2), torch.zeros_like(seg_target2))
-        seg_target2 = seg_target2[0].byte().cpu().detach()
-        new_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(seg_target1), seg_target1) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
-        self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='0_erased_src_seg')
-        self.save_vis_mask(img_path1, img_path2, new_target.cpu(), self.save_dir, count='0_initial_target_seg')
-
-        if self.opts.mean_seg:
-            if self.opts.warped_seg:  # mean_seg is the warped target img's seg
-                mean_seg = warped_down_seg.cpu().squeeze().type(torch.ByteTensor)  # 512, 512 or 256, 256
-                self.save_vis_mask(img_path1, img_path2, mean_seg.cpu(),self.save_dir,count='1_warped_target_seg')
-
-            new_target_mean_seg = torch.where((new_target == 0) * (mean_seg != 0), mean_seg, new_target)  # 220213 edited by taeu
-            self.save_vis_mask(img_path1, img_path2, new_target_mean_seg.cpu(), self.save_dir,count='1_warped_target+source_seg')
-            
-            target_mask = new_target_mean_seg.unsqueeze(0).long().to(self.opts.device)
-        else:
-            target_mask = new_target.unsqueeze(0).long().to(self.opts.device)
-
-        self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(),self.save_dir, count='2_final_target_seg')
-
-        #####################  Save Visualization of Target Segmentation Mask
-        hair_mask_target = torch.where(target_mask == 10, torch.ones_like(target_mask), torch.zeros_like(target_mask))
-        if is_downsampled:
-            hair_mask_target = F.interpolate(hair_mask_target.float().unsqueeze(0), size=(512, 512), mode='nearest')
-        else:
-            hair_mask_target = F.interpolate(hair_mask_target.float().unsqueeze(0), size=(self.opts.size, self.opts.size), mode='nearest')
-
-        if generated_mask is not None:
-            generated_mask_tensor = generated_mask.unsqueeze(0).unsqueeze(0).float().to(self.opts.device)
-            generated_mask_resized = F.interpolate(generated_mask_tensor, size=target_mask.shape[-2:], mode='nearest').squeeze(0)
-            target_mask = torch.where(generated_mask_resized == 1, 10 * torch.ones_like(target_mask), target_mask)
-
-        else :
-            self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(),self.save_dir, count='temp_target_seg')
-
-        if self.opts.optimize_warped_trg_mask:
-            hair_mask2 = torch.where(seg_target2_temp == 10, torch.ones_like(seg_target2_temp), torch.zeros_like(seg_target2_temp))
-            return target_mask, hair_mask_target, hair_mask1, hair_mask2, warped_latent_2
-        else:
-            return target_mask, hair_mask_target, hair_mask1, hair_mask2, None
 
     def create_target_segmentation_mask_with_bald(
             self, 
@@ -570,6 +213,7 @@ class Alignment():
 
         hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
         seg_target1 = seg_target1[0].byte()
+        seg_target1 = torch.where(seg_target1 == 12, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap      
         seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap
         if self.opts.optimize_warped_trg_mask:
             im1_for_kp = F.interpolate(im1, size=(256, 256))
@@ -745,9 +389,7 @@ class Alignment():
             all_inpainting = True, 
             init_align = False, 
             sign='realistic', 
-            align_more_region=False, 
             smooth=5, 
-            save_intermediate=True, 
             user_sketch=False, 
             user_mask=None,
             latent_sketch = None, 
@@ -777,7 +419,6 @@ class Alignment():
             hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
 
             latent_FS_path_1 = os.path.join(FS_dir, f'{im_name_1}.npz')
-            latent_FS_path_2 = os.path.join(FS_dir, f'{im_name_2}.npz')
 
             latent_W_path_1 = os.path.join(W_dir, f'{im_name_1}.npy')
             latent_W_path_2 = os.path.join(W_dir, f'{im_name_2}.npy')
@@ -787,11 +428,13 @@ class Alignment():
 
         else :
             target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, warped_latent_2 = self.create_target_segmentation_mask_with_bald(
-            img_path1=img_path1, img_path2=img_path2,latent_W_bald=latent_bald, 
+            img_path1=img_path1, 
+            img_path2=img_path2,
+            latent_W_bald=latent_bald, 
             user_mask=user_mask,
             user_sketch=user_sketch,
             latent_sketch=latent_sketch)
-            print("step1 : ", target_mask.shape)
+
             W_latent_path = os.path.join(save_dir, 'warped_latent_2')
             np.save(W_latent_path, warped_latent_2.detach().cpu().numpy())
 
@@ -800,20 +443,16 @@ class Alignment():
             latent_FS_path_2 = os.path.join(FS_dir, f'{im_name_2}.npz')
             latent_W_path_2 = os.path.join(W_dir, f'{im_name_2}.npy')
 
-
-        latent_S_bald, latent_F_bald = load_FS_latent(latent_baldFS_path_1, device)
-
         latent_1, latent_F_1 = load_FS_latent(latent_FS_path_1, device)
-        latent_2, _ = load_FS_latent(latent_FS_path_2, device)
 
         #####
         with torch.no_grad(): 
-            F_fill, G_bald = self.generator([latent_bald], input_is_latent=True, return_latents=False,
-                                                    start_layer=0, end_layer=3)
-            F_fill = F_fill.clone().detach()
+            # F_fill, G_bald = self.generator([latent_bald], input_is_latent=True, return_latents=False,
+            #                                         start_layer=0, end_layer=3)
+            # F_fill = F_fill.clone().detach()
             
             M_hair = (target_mask == 10) * 1.0
-            # M_hair, _ = self.dilate_erosion(M_hair.unsqueeze(0), device, dilate_erosion=smooth)
+            # M_hair, _ = self.dilate_erosion(M_hair, device, dilate_erosion=smooth)
             M_hair_down_32 = F.interpolate(M_hair.float(), size=(32, 32), mode='area')
 
             M_src = 1 - hair_mask1.unsqueeze(0)
@@ -847,29 +486,24 @@ class Alignment():
         for step in pbar:
             optimizer_align.zero_grad()
 
+            if all_inpainting :
+                latent_in = torch.cat([latent_align_1[:, :6, :], latent_1[:, 6:, :]], dim=1)
+                down_seg, gen_im = self.create_down_seg(latent_in)
 
-            latent_in = torch.cat([latent_align_1[:, :6, :], latent_1[:, 6:, :]], dim=1)
-            down_seg, gen_im = self.create_down_seg(latent_in)
-
-            # else :
-            #     F_fill, _ = self.generator([latent_align_1], input_is_latent=True, return_latents=False,
-            #                         start_layer=0, end_layer=3)
+            else :
+                F_fill, _ = self.generator([latent_align_1], input_is_latent=True, return_latents=False,
+                                    start_layer=0, end_layer=3)
                 
-            #     latent_F_mixed = F_fill + M_hair_down_32 * (F_align - F_fill)
-            #     latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
+                latent_F_mixed = F_fill + M_hair_down_32 * (F_align - F_fill)
+                # latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
 
-            #     gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
-            #                         end_layer=8, layer_in=latent_F_mixed)
+                gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
+                                    end_layer=8, layer_in=latent_F_mixed)
 
-                
-            #     G_bald_0_1 = (gen_im + 1) / 2
+                G_0_1 = (gen_im + 1) / 2
 
-            #     im = (self.downsample(G_bald_0_1) - seg_mean) / seg_std
-            #     down_seg, _, _ = self.seg(im)
-
-            #     Current_Mask = torch.argmax(down_seg, dim=1).long()
-            #     HM_G_512 = torch.where(Current_Mask == 10, torch.ones_like(Current_Mask),
-            #                         torch.zeros_like(Current_Mask)).float().unsqueeze(0)
+                im = (self.downsample(G_0_1) - seg_mean) / seg_std
+                down_seg, _, _ = self.seg(im)
 
             loss_dict = {}
             ##### Cross Entropy Loss
@@ -923,13 +557,12 @@ class Alignment():
 
 
         # latent_F_mixed = M_hair_down_32 * F_align + M_hole_down_32 * F_new + M_keep.unsqueeze(0) * F_src
-        if all_inpainting: 
-            latent_F_mixed = F_new + M_hair_down_32 * (F_align - F_new)
-            latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
-            # if latent_sketch is not None:
-            #     latent_F_mixed = F_sketch + new_hair_mask_down_32*(F_sketch - latent_F_1)
-        else : 
-            latent_F_mixed = F_new + M_hair_down_32 * (F_new - F_src)
+        latent_F_mixed = F_new + M_hair_down_32 * (F_align - F_new)
+        latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
+        # if latent_sketch is not None:
+        #     latent_F_mixed = F_sketch + new_hair_mask_down_32*(F_sketch - latent_F_1)
+
+        # latent_F_mixed = F_new + M_hair_down_32 * (F_new - F_src)
 
         gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
                                 end_layer=8, layer_in=latent_F_mixed)
@@ -938,6 +571,69 @@ class Alignment():
                                 save_intermediate=True)
 
         return gen_im, latent_F_mixed, seg_target1, M_hair_rgb, hair_mask1_rgb1, hair_mask1_rgb,bald_target1, target_mask.squeeze().cpu(), warped_latent_2, seg_target2, inpaint_seg, bald_target1
+
+    def Hair_Line_editing(self, generated_mask, bald_W, latent_FS_path_1, latent_W_path_1, smooth=5 ) :
+        device = self.device
+
+        latent_1, latent_F_1 = load_FS_latent(latent_FS_path_1, device)
+
+        M_hair = (generated_mask == 10) * 1.0
+        M_hair, _ = self.dilate_erosion(M_hair.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
+        M_hair_down_32 = F.interpolate(M_hair.float(), size=(32, 32), mode='area')
+        target_mask = generated_mask.unsqueeze(0).long()
+        
+        optimizer_align, latent_align_1 = self.setup_align_optimizer(latent_W_path_1)
+
+        with torch.no_grad():
+            tmp_latent_in = torch.cat([latent_align_1[:, :6, :], latent_1[:, 6:, :]], dim=1)
+            down_seg_tmp, I_Structure_Style_changed = self.create_down_seg(tmp_latent_in)
+
+            current_mask_tmp = torch.argmax(down_seg_tmp, dim=1).long()
+            HM_Structure = torch.where(current_mask_tmp == 10, torch.ones_like(current_mask_tmp),
+                                       torch.zeros_like(current_mask_tmp))
+            HM_Structure = F.interpolate(HM_Structure.float().unsqueeze(0), size=(256, 256), mode='nearest')
+
+        pbar = tqdm(range(self.opts.align_steps2), desc='Align Step 2', leave=False)
+        for step in pbar:
+            optimizer_align.zero_grad()
+            latent_in = torch.cat([latent_align_1[:, :6, :], latent_1[:, 6:, :]], dim=1)
+            down_seg, gen_im = self.create_down_seg(latent_in)
+
+            Current_Mask = torch.argmax(down_seg, dim=1).long()
+            HM_G_512 = torch.where(Current_Mask == 10, torch.ones_like(Current_Mask),
+                                   torch.zeros_like(Current_Mask)).float().unsqueeze(0)
+            HM_G = F.interpolate(HM_G_512, size=(256, 256), mode='nearest')
+
+            loss_dict = {}
+
+            ########## Segmentation Loss
+            ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask)
+            loss_dict["ce_loss"] = ce_loss.item()
+            loss = ce_loss
+
+            #### Style Loss
+            H1_region = self.downsample_256(I_Structure_Style_changed) * HM_Structure
+            H2_region = self.downsample_256(gen_im) * HM_G
+            style_loss = self.loss_builder.style_loss(H1_region, H2_region, mask1=HM_Structure, mask2=HM_G)
+
+            loss_dict["style_loss"] = style_loss.item()
+            loss += style_loss
+
+            loss.backward()
+            optimizer_align.step()
+
+        seg_target1 = torch.argmax(down_seg, dim=1).long()
+        seg_target1 = seg_target1[0].byte().cpu().detach()
+
+        latent_F_out_new, _ = self.generator([latent_in], input_is_latent=True, return_latents=False,
+                                                 start_layer=0, end_layer=3)
+        latent_F_out_new = latent_F_out_new.clone().detach()
+        latent_F_mixed = bald_W + M_hair_down_32* (latent_F_out_new - bald_W)
+        gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
+                            end_layer=8, layer_in=latent_F_mixed)
+        
+
+        return gen_im, latent_F_mixed, seg_target1, M_hair_down_32
 
 
     """
@@ -1239,7 +935,6 @@ class Alignment():
         unk = pred == 255
         rgb[unk, None] = color[0, :]
         return rgb
-
 
     def save_vis_mask(self, img_path1, img_path2, mask, save_dir, count = 0):
         im_name_1 = os.path.splitext(os.path.basename(img_path1))[0]
