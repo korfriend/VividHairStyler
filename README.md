@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # FS Code Style Transfer: Improved Hair Transfer for Effective Sketch Hair Editing
 (new title: Improved Hairstyle Transfer: Latent Code Optimization for Vivid Hair Representation and Sketch Hair Editing)
 
