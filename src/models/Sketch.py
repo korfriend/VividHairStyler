@@ -5,6 +5,7 @@ from scipy.spatial import KDTree
 import tqdm
 
 import sys
+
 sys.path.append('./SketchHairSalon')
 
 from SketchHairSalon.models2.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator

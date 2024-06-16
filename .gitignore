@@ -1,1 +1,9 @@
 __pycache__/
+
+*.pth
+
+# Dataset
+/test_data
+
+# Checkpoints
+/checkpoints

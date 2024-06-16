@@ -128,6 +128,7 @@ def parsing(path, ffhq, device="cuda"):
             result_dict['png'] = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             result_dict['png_gray'] = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             result_dict['png_path'] = path
+
         elif ext == 'npy':
             result_dict['npy'] = np.load(path)
             result_dict['latent'] = torch.from_numpy(result_dict['npy']).to(device)

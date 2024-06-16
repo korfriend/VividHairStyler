@@ -933,8 +933,8 @@ class Alignment():
             gen_im: StyleGAN의 결과 이미지입니다.(tensor)
             latent_in: warp된 latent vector입니다. (tensor)
             warped_down_seg: 최종 결과의 segment입니다. (tensor, (1, 512, 512))
-
-        """
+<<<<<<< HEAD
+     """
         if W_latent_path1 is None:
             W_latent_path1 = img_path1
         if W_latent_path2 is None:
