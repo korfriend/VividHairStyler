@@ -18,7 +18,7 @@ from tqdm import tqdm
 from IPython import embed
 
 from . import networks_basic as netw
-from losses import masked_lpips as util
+from src.losses import masked_lpips as util
 
 
 class DistModel(BaseModel):

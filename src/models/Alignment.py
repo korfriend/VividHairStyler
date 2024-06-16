@@ -11,19 +11,19 @@ import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
 from typing import Any, Tuple
-from utils.slic_utils import slic_custom
+from src.utils.slic_utils import slic_custom
 
 from typing import Any, Optional, Tuple
 import face_alignment
 
 # from Barbershop.models.stylegan2.model import Generator
-from utils.data_utils import convert_npy_code
+from src.utils.data_utils import convert_npy_code
 from .face_parsing.model import seg_mean, seg_std
-from losses.align_loss import AlignLossBuilder
+from src.losses.align_loss import AlignLossBuilder
 import torch.nn.functional as F
 import cv2
-from utils.data_utils import load_FS_latent, load_latent_W, load_image
-from utils.model_utils import download_weight
+from src.utils.data_utils import load_FS_latent, load_latent_W, load_image
+from src.utils.model_utils import download_weight
 
 
 # from src.embedding import Embedding

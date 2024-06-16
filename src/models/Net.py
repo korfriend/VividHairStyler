@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from models.stylegan2.model import Generator
+from src.models.stylegan2.model import Generator
 import numpy as np
 import os
 from ..utils.model_utils import download_weight

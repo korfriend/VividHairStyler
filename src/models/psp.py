@@ -3,9 +3,9 @@ import matplotlib
 matplotlib.use('Agg')
 import torch
 from torch import nn
-from models.encoders import psp_encoders
-from models.stylegan2.model import Generator
-from configs.paths_config import model_paths
+from src.models.encoders import psp_encoders
+from src.models.stylegan2.model import Generator
+from src.configs.paths_config import model_paths
 
 
 def get_keys(d, name):

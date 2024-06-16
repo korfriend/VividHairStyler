@@ -8,11 +8,12 @@ import sys
 
 sys.path.append('./SketchHairSalon')
 
-from SketchHairSalon.models2.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator
+from src.models2.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator
 import torchvision.transforms.functional as tf
 
+
 class Sk2Matte:
-    def __init__(self,load_path="./SketchHairSalon/checkpoints/S2M/200_net_G.pth"):
+    def __init__(self,load_path="./checkpoints/S2M/200_net_G.pth"):
         self.model = UnetAtGenerator(1,1,8,64,use_dropout=True)
         self.device = torch.device('cuda:0')
         state_dict = torch.load(load_path, map_location=str(self.device))
@@ -34,7 +35,7 @@ class Sk2Matte:
         return result
 
 class Sk2Image:
-    def __init__(self,load_path="./SketchHairSalon/checkpoints/S2I_unbraid/200_net_G.pth"):
+    def __init__(self,load_path="./checkpoints/S2I_unbraid/200_net_G.pth"):
         self.model = UnetAtBgGenerator(3,3,8,64,use_dropout=True)
         self.device = torch.device('cuda:0')
         state_dict = torch.load(load_path, map_location=str(self.device))
@@ -81,8 +82,8 @@ class Sk2Image:
 class SketchHairSalonModule():
     def __init__(
             self, 
-            S2M_path ="./SketchHairSalon/checkpoints/S2M/200_net_G.pth", 
-            S2I_path = "./SketchHairSalon/checkpoints/S2I_unbraid/200_net_G.pth"):
+            S2M_path ="./checkpoints/S2M/200_net_G.pth", 
+            S2I_path = "./checkpoints/S2I_unbraid/200_net_G.pth"):
         # self.args = args
         self.S2I = Sk2Image(S2I_path)
         self.S2M = Sk2Matte(S2M_path)

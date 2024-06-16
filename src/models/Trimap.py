@@ -1,9 +1,6 @@
-import sys
-sys.path.append('FBA_Matting')
-
-from FBA_Matting.demo import np_to_torch, pred, scale_input
-from FBA_Matting.dataloader import read_image, read_trimap
-from FBA_Matting.networks.models import build_model
+from src.models.FBA_Matting.demo import np_to_torch, pred, scale_input
+from src.models.FBA_Matting.dataloader import read_image, read_trimap
+from src.models.FBA_Matting.networks.models import build_model
 import torch
 import numpy as np
 import sys

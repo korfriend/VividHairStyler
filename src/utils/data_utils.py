@@ -9,7 +9,7 @@ import cv2
 import glob
 import torchvision.transforms as transforms
 from PIL import Image
-from models.Trimap import Trimap
+from src.models.Trimap import Trimap
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -143,13 +143,17 @@ def parsing(path, ffhq, device="cuda"):
     return result_dict
 
 def find(name: str, target: str, device="cuda"):
-    if name in os.listdir('database'):
-        saved_path = os.path.join("database", name)
-        # target = 
+    # 절대 경로 사용
+    base_path = os.path.abspath('/home/diglab/workspace/sketch-project/database')
+    
+    if name in os.listdir(base_path):
+        saved_path = os.path.join(base_path, name)
+        # 디버깅 메시지 추가
     else:
-        assert "데이터베이스에 해당 폴더 없습니다."
-    return parsing(saved_path, target if '.' not in target else target.split('.')[0], device=device)
-
+        raise ValueError("데이터베이스에 해당 폴더 없습니다.")
+    
+    data_dict = parsing(saved_path, target if '.' not in target else target.split('.')[0], device=device)
+    return data_dict
 
 def find_all(ffhq: str) -> dict:
     ffhq, ext = os.path.splitext(ffhq)

@@ -4,16 +4,16 @@ from .Net import Net
 import numpy as np
 import os
 from functools import partial
-from utils.bicubic import BicubicDownSample
+from src.utils.bicubic import BicubicDownSample
 from .face_parsing.model import BiSeNet, seg_mean, seg_std
-from datasets.image_dataset import ImagesDataset
-from losses.embedding_loss import EmbeddingLossBuilder
+from src.datasets.image_dataset import ImagesDataset
+from src.losses.embedding_loss import EmbeddingLossBuilder
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
 # import torchvision
 import torchvision.transforms as transforms
-from utils.data_utils import convert_npy_code
+from src.utils.data_utils import convert_npy_code
 from src.utils.data_utils import load_image, load_latent_W
 toPIL = transforms.ToPILImage()
 

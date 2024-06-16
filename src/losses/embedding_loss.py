@@ -1,5 +1,5 @@
 import torch
-from losses import lpips
+from src.losses import lpips
 import PIL
 import os
 

@@ -1,0 +1,85 @@
+img_path: 'test_data/origin/40854.png'
+
+# model path
+S2M: "./checkpoints/S2M/200_net_G.pth"
+S2I: "./checkpoints/S2I_unbraid/200_net_G.pth"
+e4e: "HairMapper/ckpts/e4e_ffhq_encode.pt"
+
+data_dir: "test_data"
+
+alpha: 0.25
+thickness: 2
+sketch_background_color: 127
+delay: 0.25
+
+device: cuda
+
+# for hair mapper
+learning_rate: 0.01
+num_iterations: 100
+loss_weight_feat: 3e-5
+loss_weight_id: 1.0
+remain_ear: False
+diffuse: False
+
+dilate_kernel_size: 50
+blur_kernel_size: 30
+truncation_psi: 0.75
+
+## for barbershop
+# StyleGAN2 setting
+size: 1024
+ckpt: Barbershop/pretrained_models/ffhq.pt
+channel_multiplier: 2
+latent: 512
+n_mlp: 8
+
+# Embedding loss options
+percept_lambda: 1.0
+l2_lambda: 1.0
+p_norm_lambda: 0.001
+l_F_lambda: 0.1
+W_steps: 300
+FS_steps: 250
+
+# Arguments
+device: cuda
+seed: 1234
+tile_latent: False
+opt_name: adam
+learning_rate: 0.01
+lr_schedule: fixed
+save_intermediate: False
+save_interval: 300
+verbose: False
+seg_ckpt: Barbershop/pretrained_models/seg.pth
+
+sign: realistic
+smooth: 5
+ce_lambda: 1.0
+style_lambda: 4e4
+align_steps1: 140
+align_steps2: 100
+blend_steps: 61
+
+# Style Your Hair
+output_dir: ./temp
+save_dir: ./temp
+embedding_dir: "./database"
+warp_steps: 100
+warp_front_part: True
+
+kp_type: 3D
+kp_loss: True
+kp_loss_lambda: 1000
+
+blend_with_align: True
+warp_loss_with_prev_list: [delta_w, style_hair_slic_large]
+save_all: True
+version: final
+
+warped_seg: True
+optimize_warped_trg_mask : True
+mean_seg : True
+
+cache_dir: cache

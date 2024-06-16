@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 
-from Barbershop.losses import masked_lpips
-from Barbershop.losses.style.style_loss import StyleLoss
-from Barbershop.losses.style.custom_loss import prepare_mask
-from Barbershop.losses.style.vgg_activations import VGG16_Activations
+from src.losses import masked_lpips
+from src.losses.style.style_loss import StyleLoss
+from src.losses.style.custom_loss import prepare_mask
+from src.losses.style.vgg_activations import VGG16_Activations
 
 
 class BlendLossBuilder(nn.Module):

@@ -19,7 +19,7 @@ from tqdm import tqdm
 from IPython import embed
 
 from . import networks_basic as networks
-from losses import lpips as util
+from src.losses import lpips as util
 
 class DistModel(BaseModel):
     def name(self):

@@ -1,6 +1,6 @@
 import torch
-from losses.style.style_loss import StyleLoss
-from losses import masked_lpips
+from src.losses.style.style_loss import StyleLoss
+from src.losses import masked_lpips
 
 class AlignLossBuilder(torch.nn.Module):
     def __init__(self, opt):

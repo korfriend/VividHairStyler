@@ -1,5 +1,7 @@
 import os
 import sys
+sys.path.insert(0, 'src')
+
 import numpy as np
 import cv2
 import torch
@@ -24,13 +26,16 @@ from src.models.Alignment import Alignment
 from src.models.Blending import Blending
 from src.losses.blend_loss import BlendLossBuilder
 
-
 #region Configurations and Constants
-args = parse_yaml('configs/config.yml')
+# config_path = os.path.join(os.path.dirname(__file__), 'src/configs/config.yml')
+current_dir = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(current_dir, 'src/configs/config.yml')
+
+args = parse_yaml(config_path)
 device = args.device
 st.set_page_config(layout="wide")
 
-root = 'database'
+root = '../sketch-project/database'
 ffhq_dir = os.path.join(root, 'ffhq')
 bald_dir = os.path.join(root, 'bald')
 baldFS_dir = os.path.join(root, 'baldFS')

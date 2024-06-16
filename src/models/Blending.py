@@ -8,13 +8,13 @@ import torchvision
 import scipy
 from .face_parsing.model import BiSeNet, seg_mean, seg_std
 from .optimizer.ClampOptimizer import ClampOptimizer
-from losses.blend_loss import BlendLossBuilder
-from utils.bicubic import BicubicDownSample
-from models.stylegan2.model import Generator
+from src.losses.blend_loss import BlendLossBuilder
+from src.utils.bicubic import BicubicDownSample
+from src.models.stylegan2.model import Generator
 import torch.nn.functional as F
 import cv2
-from utils.data_utils import load_FS_latent, get_mask_dict, load_image
-from utils.model_utils import download_weight
+from src.utils.data_utils import load_FS_latent, get_mask_dict, load_image
+from src.utils.model_utils import download_weight
 
 # from src.embedding import Embedding
 

@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 from PIL import Image
 import PIL
-from utils import data_utils
+from src.utils import data_utils
 import torchvision.transforms as transforms
 import os
 import numpy as np

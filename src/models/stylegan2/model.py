@@ -8,7 +8,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.autograd import Function
 
-from models.stylegan2.op import FusedLeakyReLU, fused_leaky_relu, upfirdn2d
+from src.models.stylegan2.op import FusedLeakyReLU, fused_leaky_relu, upfirdn2d
 import torchvision
 toPIL = torchvision.transforms.ToPILImage()
 import numpy as np

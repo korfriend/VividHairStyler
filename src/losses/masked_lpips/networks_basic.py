@@ -12,7 +12,7 @@ from skimage import color
 from IPython import embed
 from . import pretrained_networks as pn
 
-from losses import masked_lpips as util
+from src.losses import masked_lpips as util
 
 
 def spatial_average(in_tens, mask=None, keepdim=True):
