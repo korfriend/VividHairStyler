@@ -27,7 +27,11 @@ Preparing...
 
 ## Web UI
 
-You can try out our online web demo at http://223.194.45.72:3866/
+You can use the web UI by running the following command in the /VividHairStyler directory:
+```
+streamlit run VividHairStyler.py
+```
+
 
 ## Acknowledgments
 This code borrows heavily from [BARBERSHOP](https://github.com/ZPdesu/Barbershop).

@@ -27,11 +27,7 @@ from src.models.Blending import Blending
 from src.losses.blend_loss import BlendLossBuilder
 
 #region Configurations and Constants
-# config_path = os.path.join(os.path.dirname(__file__), 'src/configs/config.yml')
-current_dir = os.path.dirname(os.path.abspath(__file__))
-config_path = os.path.join(current_dir, 'src/configs/config.yml')
-
-args = parse_yaml(config_path)
+args = parse_yaml('opts/config.yml')
 device = args.device
 st.set_page_config(layout="wide")
 
