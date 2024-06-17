@@ -65,7 +65,7 @@ blend_steps: 61
 #### Style Your Hair ####
 output_dir: ./temp
 save_dir: ./temp
-embedding_dir: "./database"
+embedding_dir: "../sketch-project/database"
 warp_steps: 100
 warp_front_part: True
 

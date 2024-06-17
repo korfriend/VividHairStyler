@@ -30,8 +30,6 @@ from src.utils.model_utils import download_weight
 
 toPIL = torchvision.transforms.ToPILImage()
 
-
-
 class Alignment():
     def __init__(self, opts, embedding=None):
         self.opts = opts
@@ -514,11 +512,11 @@ class Alignment():
 
             loss.backward(retain_graph=True)
             optimizer_align.step()
-            if step % 10 == 0 or step == self.opts.align_steps1 - 1:
+            # if step % 10 == 0 or step == self.opts.align_steps1 - 1:
                 
-                target_dir = f"_temp_w_bald"
-                I = toPIL(((gen_im + 1) / 2).clamp(0, 1).squeeze().cpu())
-                I.save(f"{target_dir}/{str(step).zfill(3)}.png")
+            #     target_dir = f"_temp_w_bald"
+            #     I = toPIL(((gen_im + 1) / 2).clamp(0, 1).squeeze().cpu())
+            #     I.save(f"{target_dir}/{str(step).zfill(3)}.png")
 
         seg_target1 = torch.argmax(down_seg, dim=1).long()
         seg_target1 = seg_target1[0].byte().cpu().detach()

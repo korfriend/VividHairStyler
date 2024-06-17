@@ -1,9 +1,14 @@
 __pycache__/
-
+/_temp2
+/Output
 *.pth
 
 # Dataset
 /test_data
+/Final_images
+/opts
+/temp_images
+/test_images
 
 # Checkpoints
 /checkpoints
