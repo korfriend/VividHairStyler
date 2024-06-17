@@ -64,8 +64,8 @@ align_steps2: 100
 blend_steps: 61
 
 # Style Your Hair
-output_dir: ./logs
-save_dir: ./logs
+output_dir: ./Output
+save_dir: ./Output
 embedding_dir: "../sketch-project/database"
 warp_steps: 100
 warp_front_part: True

@@ -40,7 +40,7 @@ def fba_encoder():
 
     num_channels = 3 + 6 + 2
 
-    print(f'modifying input layer to accept {num_channels} channels')
+    # print(f'modifying input layer to accept {num_channels} channels')
     net_encoder_sd = net_encoder.state_dict()
     conv1_weights = net_encoder_sd['conv1.weight']
 
