@@ -41,6 +41,12 @@ masked_hair_dir = os.path.join(root, 'masked')
 output_dir = os.path.join('test_images')
 os.makedirs(output_dir, exist_ok=True)
 
+torch.cuda.empty_cache()
+save_dir = os.path.join("Output")
+os.makedirs(save_dir, exist_ok=True)
+args.save_dir = save_dir
+args.output_dir = save_dir
+
 st.sidebar.header("Sketch")
 st.title("Hair Transfer")
 run_opt = st.button('All decided')
@@ -102,7 +108,7 @@ def display_image_with_caption(columns, filepaths, captions, keys, indices):
     selected_filenames = []
     latents = []
     Fs = []
-    for col, filepath, cap, key, index in zip(columns, filepaths, captions, keys, indices):
+    for idx, (col, filepath, cap, key, index) in enumerate(zip(columns, filepaths, captions, keys, indices)):
         col.header(cap)
         img = None
         img_placeholder = col.empty()
@@ -119,12 +125,15 @@ def display_image_with_caption(columns, filepaths, captions, keys, indices):
             text = col.text_input(f"Enter text for {cap}", key=f"{key}_text")
             if text != "":
                 img = text_to_image(text)
+                Image.fromarray(img).save(os.path.join(save_dir,f"Reference{idx}.png"))
                 run_embedding = True
         if run_embedding:
             net = Net(args)
             ii2s = Embedding(args, net=net)
             encoder = Encoder(args.e4e, decoder=net.generator)
             _, latent_S, latent_F = cache_embedding(img, encoder = encoder, ii2s=ii2s)
+            np.savez(os.path.join(ffhq_f_dir,f"Reference{idx}.npz"), latent_in=latent_S.detach().cpu().numpy(),latent_F=latent_F.detach().cpu().numpy())
+            st.write(os.path.join(ffhq_f_dir,f"Reference{idx}.npz"))
             del net, ii2s, encoder
         else:
             data_dict = find("FS", selected_filename)
@@ -226,12 +235,6 @@ I_bg_rgb = cv2.resize(I_bg_rgb, (512, 512))
 shape_name, shape_filename, shape_image_path, background_shape_image_path = process_filename(selected_filenames[1], output_dir, ffhq_dir)
 color_name, color_filename, color_image_path, background_color_image_path = process_filename(selected_filenames[2], output_dir, ffhq_dir)
 
-torch.cuda.empty_cache()
-save_dir = os.path.join("Output", f"{ffhq_name}")
-os.makedirs(save_dir, exist_ok=True)
-args.save_dir = save_dir
-args.output_dir = save_dir
-
 progress_text = "Loading models..."
 pbar = st.progress(0, text=progress_text)
 net, ii2s, encoder = initialize_model(args)
@@ -239,7 +242,8 @@ pbar.progress(100, progress_text)
 pbar.empty()
 
 Result_FS_path = os.path.join(ffhq_f_dir, 'Result_FS.npz')
-result_image_path = os.path.join(save_dir, "Result_image.png")
+Result_Image_path = os.path.join(save_dir, "Result_image.png")
+
 
 st.title("Hair Editing")
 sketch_completed = st.button('Sketch Completed')
@@ -470,10 +474,10 @@ elif sketch_completed and user_mask is not None :
         if background_choice == "Result Image" and st.session_state.I_G_blend is not None :
             result_S, result_F = load_FS_latent(Result_FS_path)
 
-            result_img = BGR2RGB(result_image_path)
+            result_img = BGR2RGB(Result_Image_path)
             I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(result_img).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
-            result_seg_mask = ii2s.get_seg(result_image_path, target=None)
+            result_seg_mask = ii2s.get_seg(Result_Image_path, target=None)
             result_target1 = torch.argmax(result_seg_mask, dim=1).long()
             result_target1 = result_target1[0].byte()
             result_hair_mask = torch.where(result_target1==10, torch.ones_like(result_target1),torch.zeros_like(result_target1))
@@ -513,7 +517,7 @@ elif sketch_completed and user_mask is not None :
         }
 
 
-    elif edit_mode == "Hair Structure Editing" :
+    elif edit_mode == "Hair Strain Editing" :
         binary_sketch_mask = (matte_512 >= 128).astype(np.uint8) * 255
         image, latent = encoder.encode(sketch_rgb_new)
         pil_new = Image.fromarray(sketch_rgb_new)
@@ -534,10 +538,10 @@ elif sketch_completed and user_mask is not None :
         I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(sketch_rgb_new).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
         
         if background_choice == "Result Image" and st.session_state.I_G_blend is not None :
-            result_img = BGR2RGB(result_image_path)
+            result_img = BGR2RGB(Result_Image_path)
             I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(result_img).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
-            result_seg_mask = ii2s.get_seg(result_image_path, target=None)
+            result_seg_mask = ii2s.get_seg(Result_Image_path, target=None)
             result_target1 = torch.argmax(result_seg_mask, dim=1).long()
             result_target1 = result_target1[0].byte()
             result_hair_mask = torch.where(result_target1==10, torch.ones_like(result_target1),torch.zeros_like(result_target1))
@@ -605,7 +609,7 @@ blend_progress.empty()
 I_G_blend, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_mixed)
 np.savez(Result_FS_path, latent_in=latent_mixed.detach().cpu().numpy(),
             latent_F=F_mixed.detach().cpu().numpy())
-Image.fromarray(ii2s.tensor_to_numpy(I_G_blend)).save(result_image_path)
+Image.fromarray(ii2s.tensor_to_numpy(I_G_blend)).save(Result_Image_path)
 
 st.session_state.I_G_blend = ii2s.tensor_to_numpy(I_G_blend)
 st.session_state.canvas_background = cv2.resize(st.session_state.I_G_blend, (512, 512))

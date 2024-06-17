@@ -23,8 +23,15 @@ All dependencies for defining the environment are provided in `environment.yaml`
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) 
 
 ## Download additional files
-Please download the additional `.pth` files required for the project from the following link: <a href="https://drive.google.com/drive/folders/1R-Af1g8kkjkiQVGGiODhBNPQiJw6t32Y?usp=sharing" target="_blank">Additional Files</a>.
+<!-- Please download the additional `.pth` files required for the project from the following link: <a href="https://drive.google.com/drive/folders/1R-Af1g8kkjkiQVGGiODhBNPQiJw6t32Y?usp=sharing" target="_blank">Additional Files</a>. -->
 
+| Path | Description
+| :--- | :----------
+|[FFHQ StyleGAN](https://drive.google.com/file/d/1g8S81ZybmrF86OjvjLYJzx-wx83ZOiIw/view?usp=drive_link) | StyleGAN model pretrained on FFHQ with 1024x1024 output resolution.
+|[Face Parse Model](https://drive.google.com/file/d/1OG6t7q4PpHOoYNdP-ipoxuqYbfMSgPta/view?usp=drive_link) | Pretrained face parse model taken from [Barbershop](https://github.com/ZPdesu/Barbershop/).
+|[Face Landmark Model](https://drive.google.com/file/d/1c-SgUUQj0X1mIl-W-_2sMboI2QS7GzfK/view?usp=drive_link) | Used to align unprocessed images.
+|[Image Invert Model](https://drive.google.com/file/d/1cUv_reLE6k3604or78EranS7XzuVMWeO/view?usp=sharing) | Pretrained image embedding model taken from [encoder4editing](https://github.com/omertov/encoder4editing)
+|[Sketch2Image Model](https://drive.google.com/file/d/1XiJbvWxzDCZaA-p1s6BWKasIMVlHcOrx/view?usp=sharing) | Pretrained image embedding model taken from [SketchHairSalon](https://github.com/chufengxiao/SketchHairSalon/)
 
 ## Getting Started  
 Preparing...

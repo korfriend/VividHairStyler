@@ -187,8 +187,7 @@ class Alignment():
             latent_W_bald, 
             is_downsampled=True, 
             user_sketch = False,
-            user_mask = None, 
-            latent_sketch = None,
+            user_mask = None,
             pbar=None
             ) :
         im1 = self.preprocess_img(img_path1)
@@ -371,7 +370,6 @@ class Alignment():
             return target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, warped_latent_2
         else:
             return target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, None
-
  
     def M2H_test(
             self, 
@@ -390,8 +388,6 @@ class Alignment():
             smooth=5, 
             user_sketch=False, 
             user_mask=None,
-            latent_sketch = None, 
-            sketch_mask = None
             ):
 
         device = self.device
@@ -401,9 +397,7 @@ class Alignment():
         im_name_1 = os.path.splitext(os.path.basename(img_path1))[0]
         im_name_2 = os.path.splitext(os.path.basename(img_path2))[0]
 
-        latent_baldFS_path_1 = os.path.join(baldFS_dir, f'{im_name_1}.npz')
         latent_baldW_path_1 = os.path.join(bald_dir, f'{im_name_1}.npy')
-        # latent_bald = load_latent_W(latent_baldW_path_1, device)
         latent_bald = load_latent_W(latent_baldW_path_1, device)
 
         if generated_mask is not None:
@@ -431,7 +425,7 @@ class Alignment():
             latent_W_bald=latent_bald, 
             user_mask=user_mask,
             user_sketch=user_sketch,
-            latent_sketch=latent_sketch)
+            )
 
             W_latent_path = os.path.join(save_dir, 'warped_latent_2')
             np.save(W_latent_path, warped_latent_2.detach().cpu().numpy())
@@ -445,10 +439,6 @@ class Alignment():
 
         #####
         with torch.no_grad(): 
-            # F_fill, G_bald = self.generator([latent_bald], input_is_latent=True, return_latents=False,
-            #                                         start_layer=0, end_layer=3)
-            # F_fill = F_fill.clone().detach()
-            
             M_hair = (target_mask == 10) * 1.0
             # M_hair, _ = self.dilate_erosion(M_hair, device, dilate_erosion=smooth)
             M_hair_down_32 = F.interpolate(M_hair.float(), size=(32, 32), mode='area')
@@ -493,7 +483,6 @@ class Alignment():
                                     start_layer=0, end_layer=3)
                 
                 latent_F_mixed = F_fill + M_hair_down_32 * (F_align - F_fill)
-                # latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
 
                 gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
                                     end_layer=8, layer_in=latent_F_mixed)
@@ -504,8 +493,8 @@ class Alignment():
                 down_seg, _, _ = self.seg(im)
 
             loss_dict = {}
-            ##### Cross Entropy Loss
 
+            ##### Cross Entropy Loss
             ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask.squeeze(0))
             loss_dict["ce_loss"] = ce_loss.item()
             loss = ce_loss
@@ -522,7 +511,7 @@ class Alignment():
         seg_target1 = seg_target1[0].byte().cpu().detach()
 
         if generated_mask is not None :
-            self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='down_seg_new')
+            self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='down_seg_w/_target_mask')
         
         else : 
             self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='down_seg')
@@ -554,13 +543,8 @@ class Alignment():
             hair_mask1_rgb1[:, mask1] = torch.tensor([0.0, 183.0, 235.0]).view(3, 1)
 
 
-        # latent_F_mixed = M_hair_down_32 * F_align + M_hole_down_32 * F_new + M_keep.unsqueeze(0) * F_src
         latent_F_mixed = F_new + M_hair_down_32 * (F_align - F_new)
         latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
-        # if latent_sketch is not None:
-        #     latent_F_mixed = F_sketch + new_hair_mask_down_32*(F_sketch - latent_F_1)
-
-        # latent_F_mixed = F_new + M_hair_down_32 * (F_new - F_src)
 
         gen_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
                                 end_layer=8, layer_in=latent_F_mixed)
