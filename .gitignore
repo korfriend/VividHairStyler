@@ -14,3 +14,8 @@ __pycache__/
 
 # Checkpoints
 /checkpoints
+
+# Test file
+run.py
+web_demo_mockup.py
+web_demo_mockup2.py

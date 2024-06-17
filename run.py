@@ -104,45 +104,86 @@ pbar.progress(100, progress_text)
 pbar.empty()
 st.markdown("---")
 
+eraser_mode = st.checkbox("eraser mode", False, key='mode1', help="지우기모드를 사용합니다.")
+
+# st.markdown(images[0].shape)
+bg = ii2s.get_seg(images[0], target=10).detach().cpu().numpy().astype(np.uint8) * 255
+
+cs = st.columns(2)
+cs[0].image(cv2.resize(images[0], (512, 512)))
+cs[1].image(bg)
+bg_copy = bg.copy()
+bg = np.dstack([bg,bg,bg])
+
+# bg = Image.fromarray(cv2.resize(images[0], (512, 512)))
+
+alpha = 0.5
+# st.markdown(bg.shape)
+# st.markdown(cv2.resize(images[0], (512, 512)).shape)
+# st.markdown(bg.dtype)
+# st.markdown(images[0].dtype)
+bg = cv2.addWeighted(cv2.resize(images[0], (512, 512)), alpha, bg, 1-alpha ,0)
+bg = Image.fromarray(bg)
 can1, can2 = st.columns(2)
 with can1:
     canvas_mask_result = st_canvas(
-        stroke_width=75,
-        stroke_color="#000",
-        background_color="#eee",
-        background_image=Image.fromarray(st.session_state.canvas_background),
+        stroke_width=55,
+        stroke_color= "#111" if eraser_mode else "#EEEEEE",
+        background_color="#000",
+        background_image=bg,
         update_streamlit=True,
-        width=st.session_state.canvas_background.shape[1],
-        height=st.session_state.canvas_background.shape[0],
+        width=512,
+        height=512,
         drawing_mode='freedraw',
         point_display_radius=0,
         key="canvas1",
     )
-can1.image(canvas_mask_result.image_data)
+if canvas_mask_result.image_data is not None:
+    can1.header("canvas result")
+    can1.image(canvas_mask_result.image_data)
+    can1.header("RGBA->GRAY")
+    can1.image(cv2.cvtColor(canvas_mask_result.image_data, cv2.COLOR_RGBA2GRAY))
+    
+    mask1 = canvas_mask_result.image_data[:,:,0] > 127
+    mask2 = canvas_mask_result.image_data[:,:,0] != 0
+    mask2 = np.logical_xor(mask1, mask2)
+    can1.header("mask1")
+    can1.image(mask1.astype(np.uint8)*255)
+    can1.header("mask2")
+    can1.image(mask2.astype(np.uint8)*255)
+    
+
+    mask = np.where(mask1, 255, bg_copy)
+    mask = np.where(mask2, 0, mask)
+    
+    can2.image(mask.astype(np.uint8))
+
+    # mask = parse_json(canvas_mask_result.json_data, bg=bg_copy)
+    # can2.image(mask)
 
 
 st1, st2 = st.columns(2)
-# I_glign_1_2, F7_blend_1_2, HM_1_2, M_hole, \
-# M_hair, M_src,bald_seg_target1, target_mask, \
-# warped_latent_2, seg_target2, inpaint_seg, bald_target1 = align1.M2H_test(
-#     None, 
-#     Ws[1], 
-#     os.path.join(args.data_dir, 'ffhq', ffhqs[0]), # find('ffhq', ffhqs[0], root=args.data_dir)['png_path'], 
-#     os.path.join(args.data_dir, 'ffhq', ffhqs[1]), # find('ffhq', ffhqs[1], root=args.data_dir)['png_path'], 
-#     os.path.join(args.data_dir, "FS"), 
-#     os.path.join(args.data_dir, "W+"), 
-#     os.path.join(args.data_dir, "bladFS"), 
-#     os.path.join(args.data_dir, "bald"), 
-#     args.save_dir, 
-#     all_inpainting = True, 
-#     init_align = False, 
-#     sign=args.sign, 
-#     # align_more_region=False, 
-#     smooth=args.smooth, 
-#     # save_intermediate=False, 
-#     user_mask=None, 
-#     user_sketch=False
-# )
+I_glign_1_2, F7_blend_1_2, HM_1_2, M_hole, \
+M_hair, M_src,bald_seg_target1, target_mask, \
+warped_latent_2, seg_target2, inpaint_seg, bald_target1 = align1.M2H_test(
+    None, 
+    Ws[1], 
+    os.path.join(args.data_dir, 'ffhq', ffhqs[0]), # find('ffhq', ffhqs[0], root=args.data_dir)['png_path'], 
+    os.path.join(args.data_dir, 'ffhq', ffhqs[1]), # find('ffhq', ffhqs[1], root=args.data_dir)['png_path'], 
+    os.path.join(args.data_dir, "FS"), 
+    os.path.join(args.data_dir, "W+"), 
+    os.path.join(args.data_dir, "bladFS"), 
+    os.path.join(args.data_dir, "bald"), 
+    args.save_dir, 
+    all_inpainting = True, 
+    init_align = False, 
+    sign=args.sign, 
+    # align_more_region=False, 
+    smooth=args.smooth, 
+    # save_intermediate=False, 
+    user_mask=None, 
+    user_sketch=False
+)
 
 
 # I_glign_1_2, F7_blend_1_2, HM_1_2 = align2.M2H_test(
