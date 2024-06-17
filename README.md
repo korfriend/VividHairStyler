@@ -33,9 +33,9 @@ pip install -r requirements.txt
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/Database/ffhq` directory.
 
 ## Download pretrained models
-Clone the the pretrained models into `/checkpoints` directory by cmd below:
+Clone the the pretrained models into `/checkpoints` directory :
 
-| Path | Description
+| Model | Description
 | :--- | :----------
 |[FFHQ StyleGAN](https://drive.google.com/file/d/1g8S81ZybmrF86OjvjLYJzx-wx83ZOiIw/view?usp=drive_link) | StyleGAN model pretrained on FFHQ with 1024x1024 output resolution.
 |[Face Parse Model](https://drive.google.com/file/d/1OG6t7q4PpHOoYNdP-ipoxuqYbfMSgPta/view?usp=drive_link) | Pretrained face parse model taken from [Barbershop](https://github.com/ZPdesu/Barbershop/).
