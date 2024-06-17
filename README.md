@@ -27,7 +27,7 @@ Preparing...
 
 ## Web UI
 
-You can use the web UI by running the following command in the /VividHairStyler directory:
+You can use the web UI by running the following command in the `/VividHairStyler` directory:
 ```
 streamlit run VividHairStyler.py
 ```
