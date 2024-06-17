@@ -22,6 +22,10 @@ All dependencies for defining the environment are provided in `environment.yaml`
 ## Download sample images
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) 
 
+## Download additional files
+Please download the additional `.pth` files required for the project from the following link: <a href="https://drive.google.com/drive/folders/1R-Af1g8kkjkiQVGGiODhBNPQiJw6t32Y?usp=sharing" target="_blank">Additional Files</a>.
+
+
 ## Getting Started  
 Preparing...
 

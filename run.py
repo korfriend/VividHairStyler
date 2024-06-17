@@ -46,7 +46,7 @@ n_saved_image = len(os.listdir(args.output_dir))
 filepath_list = sorted(os.listdir(os.path.join(args.data_dir, "ffhq")))
 
 
-@st.cache_data
+# @st.cache_data
 def setup_data(ffhq, uploaded_image):
     if uploaded_image:
         raise "아직입니다."
@@ -57,12 +57,14 @@ def setup_data(ffhq, uploaded_image):
             # image_placeholder.image(uploaded_image)
     else:
         # found = 
-        img = find("ffhq", ffhq, root=args.data_dir)['png']
-        W = find("W+", ffhq, root=args.data_dir)['latent']
-        found = find("FS", ffhq, root=args.data_dir)
+        img = cv2.imread(os.path.join(args.data_dir, "ffhq", ffhq))# find("ffhq", ffhq, root=args.data_dir)['png']
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # st.markdown(os.path.join(args.data_dir, "W+", f"{ffhq[:5]}.npy"))
+        W = np.load(os.path.join(args.data_dir, "W+", f"{ffhq[:5]}.npy"))# find("W+", ffhq, root=args.data_dir)['latent']
+        found = np.load(os.path.join(args.data_dir, "FS", f"{ffhq[:5]}.npz"))# find("FS", ffhq, root=args.data_dir)
         FS = {
-            'latent_in': found['latent_in'],
-            'latent_F': found['latent_F'],
+            'latent_in': torch.from_numpy(found['latent_in']).to(device),
+            'latent_F': torch.from_numpy(found['latent_F']).to(device),
         }
     return img, FS, W
 
@@ -102,49 +104,65 @@ pbar.progress(100, progress_text)
 pbar.empty()
 st.markdown("---")
 
+can1, can2 = st.columns(2)
+with can1:
+    canvas_mask_result = st_canvas(
+        stroke_width=75,
+        stroke_color="#000",
+        background_color="#eee",
+        background_image=Image.fromarray(st.session_state.canvas_background),
+        update_streamlit=True,
+        width=st.session_state.canvas_background.shape[1],
+        height=st.session_state.canvas_background.shape[0],
+        drawing_mode='freedraw',
+        point_display_radius=0,
+        key="canvas1",
+    )
+can1.image(canvas_mask_result.image_data)
+
 
 st1, st2 = st.columns(2)
-I_glign_1_2, F7_blend_1_2, HM_1_2, M_hole, \
-M_hair, M_src,bald_seg_target1, target_mask, \
-warped_latent_2, seg_target2, inpaint_seg, bald_target1 = align1.M2H_test(
-    None, 
-    Ws[1], 
-    find('ffhq', ffhqs[0], root=args.data_dir)['png_path'], 
-    find('ffhq', ffhqs[1], root=args.data_dir)['png_path'], 
-    os.path.join(args.data_dir, "FS"), 
-    os.path.join(args.data_dir, "W+"), 
-    os.path.join(args.data_dir, "bladFS"), 
-    os.path.join(args.data_dir, "bald"), 
-    args.save_dir, 
-    all_inpainting = True, 
-    init_align = False, 
-    sign=args.sign, 
-    align_more_region=False, 
-    smooth=args.smooth, 
-    save_intermediate=False, 
-    user_mask=None, 
-    user_sketch=False
-)
+# I_glign_1_2, F7_blend_1_2, HM_1_2, M_hole, \
+# M_hair, M_src,bald_seg_target1, target_mask, \
+# warped_latent_2, seg_target2, inpaint_seg, bald_target1 = align1.M2H_test(
+#     None, 
+#     Ws[1], 
+#     os.path.join(args.data_dir, 'ffhq', ffhqs[0]), # find('ffhq', ffhqs[0], root=args.data_dir)['png_path'], 
+#     os.path.join(args.data_dir, 'ffhq', ffhqs[1]), # find('ffhq', ffhqs[1], root=args.data_dir)['png_path'], 
+#     os.path.join(args.data_dir, "FS"), 
+#     os.path.join(args.data_dir, "W+"), 
+#     os.path.join(args.data_dir, "bladFS"), 
+#     os.path.join(args.data_dir, "bald"), 
+#     args.save_dir, 
+#     all_inpainting = True, 
+#     init_align = False, 
+#     sign=args.sign, 
+#     # align_more_region=False, 
+#     smooth=args.smooth, 
+#     # save_intermediate=False, 
+#     user_mask=None, 
+#     user_sketch=False
+# )
 
 
-I_glign_1_2, F7_blend_1_2, HM_1_2 = align2.M2H_test(
-    None, 
-    img_path1 = images[0], 
-    img_path2 = images[1], 
-    save_dir = args.save_dir, 
-    latent_FS_path_1 = FSs[0], 
-    latent_FS_path_2 = FSs[1], 
-    latent_W_path_1 = Ws[0], 
-    latent_W_path_2 = Ws[1], 
-    sign=args.sign, 
-    align_more_region=False, 
-    smooth=args.smooth, 
-    save_intermediate=False, 
-    user_mask = None, 
-    user_sketch = False,
-    pbar = pbar
-)
-st2.image(ii2s.tensor_to_numpy(I_glign_1_2))
+# I_glign_1_2, F7_blend_1_2, HM_1_2 = align2.M2H_test(
+#     None, 
+#     img_path1 = images[0], 
+#     img_path2 = images[1], 
+#     save_dir = args.save_dir, 
+#     latent_FS_path_1 = FSs[0], 
+#     latent_FS_path_2 = FSs[1], 
+#     latent_W_path_1 = Ws[0], 
+#     latent_W_path_2 = Ws[1], 
+#     sign=args.sign, 
+#     align_more_region=False, 
+#     smooth=args.smooth, 
+#     save_intermediate=False, 
+#     user_mask = None, 
+#     user_sketch = False,
+#     pbar = pbar
+# )
+# st2.image(ii2s.tensor_to_numpy(I_glign_1_2))
 
 del align2
 del ii2s
