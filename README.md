@@ -32,8 +32,9 @@ pip install -r requirements.txt
 ## Download sample images
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/Database/ffhq` directory.
 
-## Download additional files
-Please place the downloaded models in the `/checkpoints` directory.
+## Download pretrained models
+ `/checkpoints` directory.
+Clone the the pretrained models into `/checkpoints` directory by cmd below:
 
 | Path | Description
 | :--- | :----------
