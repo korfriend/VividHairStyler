@@ -148,7 +148,6 @@ def find(name: str, target: str, device="cuda"):
     
     if name in os.listdir(base_path):
         saved_path = os.path.join(base_path, name)
-        # 디버깅 메시지 추가
     else:
         raise ValueError("데이터베이스에 해당 폴더 없습니다.")
     
