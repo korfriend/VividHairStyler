@@ -30,7 +30,7 @@ class Sk2Matte:
         return result
 
 class Sk2Image:
-    def __init__(self,load_path="./SketchHairSalon/checkpoints/S2I_unbraid/200_net_G.pth"):
+    def __init__(self,load_path="./SketchHairSalon/checkpoints/S2I_unbraid/200_net_G."):
         self.model = UnetAtBgGenerator(3,3,8,64,use_dropout=True)
         self.device = torch.device('cuda:0')
         state_dict = torch.load(load_path, map_location=str(self.device))

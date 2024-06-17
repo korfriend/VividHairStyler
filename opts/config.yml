@@ -15,6 +15,7 @@ delay: 0.25
 device: cuda
 
 # for hair mapper
+bald_model_path: checkpoints/final/best_model.pt
 learning_rate: 0.01
 num_iterations: 100
 loss_weight_feat: 3e-5

@@ -41,12 +41,6 @@ masked_hair_dir = os.path.join(root, 'masked')
 output_dir = os.path.join('test_images')
 os.makedirs(output_dir, exist_ok=True)
 
-torch.cuda.empty_cache()
-save_dir = os.path.join("Output")
-os.makedirs(save_dir, exist_ok=True)
-args.save_dir = save_dir
-args.output_dir = save_dir
-
 st.sidebar.header("Sketch")
 st.title("Hair Transfer")
 run_opt = st.button('All decided')
@@ -108,7 +102,7 @@ def display_image_with_caption(columns, filepaths, captions, keys, indices):
     selected_filenames = []
     latents = []
     Fs = []
-    for idx, (col, filepath, cap, key, index) in enumerate(zip(columns, filepaths, captions, keys, indices)):
+    for col, filepath, cap, key, index in zip(columns, filepaths, captions, keys, indices):
         col.header(cap)
         img = None
         img_placeholder = col.empty()
@@ -125,15 +119,12 @@ def display_image_with_caption(columns, filepaths, captions, keys, indices):
             text = col.text_input(f"Enter text for {cap}", key=f"{key}_text")
             if text != "":
                 img = text_to_image(text)
-                Image.fromarray(img).save(os.path.join(save_dir,f"Reference{idx}.png"))
                 run_embedding = True
         if run_embedding:
             net = Net(args)
             ii2s = Embedding(args, net=net)
             encoder = Encoder(args.e4e, decoder=net.generator)
             _, latent_S, latent_F = cache_embedding(img, encoder = encoder, ii2s=ii2s)
-            np.savez(os.path.join(ffhq_f_dir,f"Reference{idx}.npz"), latent_in=latent_S.detach().cpu().numpy(),latent_F=latent_F.detach().cpu().numpy())
-            st.write(os.path.join(ffhq_f_dir,f"Reference{idx}.npz"))
             del net, ii2s, encoder
         else:
             data_dict = find("FS", selected_filename)
@@ -235,6 +226,12 @@ I_bg_rgb = cv2.resize(I_bg_rgb, (512, 512))
 shape_name, shape_filename, shape_image_path, background_shape_image_path = process_filename(selected_filenames[1], output_dir, ffhq_dir)
 color_name, color_filename, color_image_path, background_color_image_path = process_filename(selected_filenames[2], output_dir, ffhq_dir)
 
+torch.cuda.empty_cache()
+save_dir = os.path.join("Output", f"{ffhq_name}")
+os.makedirs(save_dir, exist_ok=True)
+args.save_dir = save_dir
+args.output_dir = save_dir
+
 progress_text = "Loading models..."
 pbar = st.progress(0, text=progress_text)
 net, ii2s, encoder = initialize_model(args)
@@ -253,7 +250,7 @@ edit_mode = st.radio(
     ("Hair Line Editing", "Hair Strain Editing"),
     key="edit_mode"
 )
-eraser_mode = st.checkbox("eraser mode", False, key='mode1', help="지우기모드를 사용합니다.")
+
 
 background_choice = st.radio(
     "Choose canvas background:", 
@@ -273,6 +270,7 @@ if edit_mode == "Hair Line Editing":
     # line_editing_bg = cv2.addWeighted(cv2.resize(images[0], (512, 512)), alpha, line_editing_bg, 1-alpha ,0)
     # line_editing_bg = Image.fromarray(line_editing_bg)
     # line_editing_bg, mask = make_hair_line_background(images[0])
+    eraser_mode = st.sidebar.checkbox("eraser mode", False, key='mode1', help="지우기모드를 사용합니다.")
     with can1:
         canvas_result = st_canvas(
             stroke_width=stroke_width,
@@ -293,6 +291,8 @@ if edit_mode == "Hair Line Editing":
         user_mask = np.where(mask1, 255, st.session_state.canvas_background2_mask)
         user_mask = np.where(mask2, 0, user_mask)
         user_mask = user_mask > 0
+        Image.fromarray(user_mask).save(os.path.join(save_dir,"user_mask.png"))
+
 
 elif edit_mode == "Hair Strain Editing":
     stroke_width = st.sidebar.slider("Stroke width (structure): ", 1, 100, 5, key="structure_editing_stroke_width")
@@ -320,65 +320,9 @@ if stroke_color == "#000":
     stroke_color = "#111"
 
 
-# def set_background_image(background_choice, I_bg_rgb):
-#     if background_choice == "Result Image" and 'I_G_blend' in st.session_state and st.session_state.I_G_blend is not None:
-#         st.session_state.canvas_background = cv2.resize(st.session_state.I_G_blend, (512, 512))
-#         return st.session_state.I_G_blend
-#     else:
-#         st.session_state.canvas_background = cv2.resize(I_bg_rgb, (512, 512))
-#         return I_bg_rgb
-
-
-
-
-# with can1:
-#     canvas_result = st_canvas(
-#         stroke_width=stroke_width,
-#         stroke_color=stroke_color,
-#         background_color="#eee",
-#         background_image=Image.fromarray(st.session_state.canvas_background),
-#         update_streamlit=True,
-#         width=st.session_state.canvas_background.shape[1],
-#         height=st.session_state.canvas_background.shape[0],
-#         drawing_mode='freedraw',
-#         point_display_radius=0,
-#         key="canvas",
-#     )
-#     st.header("Hair Line Editing")
-#     line_editing_bg = ii2s.get_seg(images[0], target=10).detach().cpu().numpy().astype(np.uint8) * 255
-#     line_editing_bg_ = line_editing_bg.copy()
-#     line_editing_bg = np.dstack([line_editing_bg,line_editing_bg,line_editing_bg])
-#     alpha = 0.5
-#     line_editing_bg = cv2.addWeighted(cv2.resize(images[0], (512, 512)), alpha, line_editing_bg, 1-alpha ,0)
-#     line_editing_bg = Image.fromarray(line_editing_bg)
-
-#     canvas_result2 = st_canvas(
-#         stroke_width=stroke_width,
-#         stroke_color="#111" if eraser_mode else "#EEEEEE",
-#         background_color="#eee",
-#         background_image=line_editing_bg,
-#         update_streamlit=True,
-#         width=512,
-#         height=512,
-#         drawing_mode='freedraw',
-#         point_display_radius=0,
-#         key="canvas2",
-#     )
-#     mask1 = canvas_result2.image_data[:,:,0] > 127
-#     mask2 = canvas_result2.image_data[:,:,0] != 0
-#     mask2 = np.logical_xor(mask1, mask2)
-
-#     user_mask = np.where(mask1, 255, line_editing_bg_)
-#     user_mask = np.where(mask2, 0, user_mask)
-#     user_mask = user_mask > 0
-
 can2.header("Result Image")
 if 'I_G_blend' in st.session_state and st.session_state.I_G_blend is not None:
     can2.image(st.session_state.I_G_blend)
-
-# user_mask = None
-# if canvas_result:
-#     user_mask = ~np.all(canvas_result.image_data[:, :, :3] == [0, 0, 0], axis=-1)
 
 sketch_rgb = parse_json(canvas_result.json_data)
 SHS = SketchHairSalonModule(args.S2M, args.S2I)
@@ -390,7 +334,6 @@ if not run_opt and not sketch_completed:
 #endregion
 
 #region Initialize models
-
 M_ori = get_mask_dict(im=images[0], mask=None, embedding=ii2s)
 M_shape = get_mask_dict(im=images[1], mask=None, embedding=ii2s)
 M_color = get_mask_dict(im=images[2], mask=None, embedding=ii2s)
@@ -597,7 +540,7 @@ for step in pbar:
     else :
         hair_loss = loss_builder._loss_hair_percept(im_dict['gen_im'], im_dict['im_3'], im_dict['mask_hair'])
 
-    total_loss += face_loss + hair_loss + 1000 * style_loss
+    total_loss += face_loss + hair_loss + 5000 * style_loss
     opt_blend.zero_grad()
     total_loss.backward(retain_graph=True)
     opt_blend.step()
@@ -605,6 +548,10 @@ for step in pbar:
     blend_progress.progress((step + 1) / 150, text=f"Blending in progress... ({step + 1}/150)")
 
 blend_progress.empty()
+
+st.image(ii2s.tensor_to_numpy(im_dict['mask_hair']))
+st.image(ii2s.tensor_to_numpy(im_dict['mask_2_hair']))
+st.image(ii2s.tensor_to_numpy(I_G_color))
 
 I_G_blend, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_mixed)
 np.savez(Result_FS_path, latent_in=latent_mixed.detach().cpu().numpy(),

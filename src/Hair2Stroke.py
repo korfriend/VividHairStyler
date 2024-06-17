@@ -103,5 +103,3 @@ class CustomTestOptions:
         self.gpu_ids = [0]
         # 필요한 다른 옵션들 추가
 
-'/home/diglab/workspace/sketch-project/checkpoints/latest_net_G.pth'  # 모델 경로 추가
-        
