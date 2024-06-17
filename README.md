@@ -19,21 +19,25 @@ cd VividHairStyler
 We recommend running this repository using [Anaconda](https://docs.anaconda.com/anaconda/install/). 
 All dependencies for defining the environment are provided in `environment.yaml`.
 
+- Python environment
+Alternatively, you can set up the Python environment using `pip`:
+```
+pip install -r requirements.txt
+```
+
 ## Download sample images
-Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) 
+Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/Database/ffhq` directory.
 
 ## Download additional files
-
 Please place the downloaded models in the `/checkpoints` directory.
 
-| Path | Description |
-| :--- | :---------- |
-| <a href="https://drive.google.com/file/d/1g8S81ZybmrF86OjvjLYJzx-wx83ZOiIw/view?usp=drive_link" target="_blank">FFHQ StyleGAN</a> | StyleGAN model pretrained on FFHQ with 1024x1024 output resolution. |
-| <a href="https://drive.google.com/file/d/1OG6t7q4PpHOoYNdP-ipoxuqYbfMSgPta/view?usp=drive_link" target="_blank">Face Parse Model</a> | Pretrained face parse model taken from [Barbershop](https://github.com/ZPdesu/Barbershop/). |
-| <a href="https://drive.google.com/file/d/1c-SgUUQj0X1mIl-W-_2sMboI2QS7GzfK/view?usp=drive_link" target="_blank">Face Landmark Model</a> | Used to align unprocessed images. |
-| <a href="https://drive.google.com/file/d/1cUv_reLE6k3604or78EranS7XzuVMWeO/view?usp=sharing" target="_blank">Image Invert Model</a> | Pretrained image embedding model taken from [encoder4editing](https://github.com/omertov/encoder4editing). |
-| <a href="https://drive.google.com/file/d/1XiJbvWxzDCZaA-p1s6BWKasIMVlHcOrx/view?usp=sharing" target="_blank">Sketch2Image Model</a> | Pretrained image embedding model taken from [SketchHairSalon](https://github.com/chufengxiao/SketchHairSalon/). |
-
+| Path | Description
+| :--- | :----------
+|[FFHQ StyleGAN](https://drive.google.com/file/d/1g8S81ZybmrF86OjvjLYJzx-wx83ZOiIw/view?usp=drive_link) | StyleGAN model pretrained on FFHQ with 1024x1024 output resolution.
+|[Face Parse Model](https://drive.google.com/file/d/1OG6t7q4PpHOoYNdP-ipoxuqYbfMSgPta/view?usp=drive_link) | Pretrained face parse model taken from [Barbershop](https://github.com/ZPdesu/Barbershop/).
+|[Face Landmark Model](https://drive.google.com/file/d/1c-SgUUQj0X1mIl-W-_2sMboI2QS7GzfK/view?usp=drive_link) | Used to align unprocessed images.
+|[Image Invert Model](https://drive.google.com/file/d/1cUv_reLE6k3604or78EranS7XzuVMWeO/view?usp=sharing) | Pretrained image embedding model taken from [encoder4editing](https://github.com/omertov/encoder4editing)
+|[Sketch2Image Model](https://drive.google.com/file/d/1XiJbvWxzDCZaA-p1s6BWKasIMVlHcOrx/view?usp=sharing) | Pretrained image embedding model taken from [SketchHairSalon](https://github.com/chufengxiao/SketchHairSalon/)
 
 ## Getting Started  
 Preparing...
