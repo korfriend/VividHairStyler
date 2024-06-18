@@ -73,17 +73,11 @@ Clone the the pretrained models into `/${PROJECT_ROOT}/pretrained_models` direct
 Finally, these pretrained models should be organized as follows:
 ```
 ./pretrained_models/
-├── afhqcat_PCA.npz
-├── afhqdog_PCA.npz
-├── afhqwild_PCA.npz
 ├── e4e_ffhq_encode.pt
-├── face_parsing.pth
 ├── ffhq_PCA.npz
 ├── ffhq.pt
 ├── final
 │   └── best_model.pt
-├── metfaces_PCA.npz
-├── model_ir_se50.pth
 ├── S2I_braid
 │   ├── 400_net_D.pth
 │   └── 400_net_G.pth
@@ -93,9 +87,7 @@ Finally, these pretrained models should be organized as follows:
 ├── S2M
 │   ├── 200_net_D.pth
 │   └── 200_net_G.pth
-├── seg.pth
-├── StyleGAN2-ada-Generator.pth
-└── vgg16.pth
+└── seg.pth
 ```
 
 ### Web UI

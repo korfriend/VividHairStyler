@@ -304,7 +304,7 @@ st.sidebar.header("Sketch")
 
 edit_mode = st.radio(
     "Choose editing mode:", 
-    ("Hair Line Editing", "Hair Strain Editing"),
+    ("Hair Mask Editing", "Hair Strain Editing"),
     key="edit_mode"
 )
 
@@ -317,7 +317,7 @@ background_choice = st.radio(
 I_src_rgb = set_background_image(background_choice, I_src_rgb)
 
 can1, can2 = st.columns(2)
-if edit_mode == "Hair Line Editing":
+if edit_mode == "Hair Mask Editing":
     stroke_width = st.sidebar.slider("Stroke width (line): ", 1, 100, 50, key="line_editing_stroke_width")
     stroke_color = "#000001"  # black
     eraser_mode = st.sidebar.checkbox("eraser mode", False, key='mode1', help="지우기모드를 사용합니다.")
@@ -448,7 +448,7 @@ if run_opt:
 
 
 elif sketch_completed and user_mask is not None :
-    if edit_mode == "Hair Line Editing" :
+    if edit_mode == "Hair Mask Editing" :
         bald_module = Bald(args.bald_model_path)
         W_src_bald = bald_module.make_bald(W_src)
 
@@ -525,6 +525,7 @@ elif sketch_completed and user_mask is not None :
 
         binary_sketch_mask = (matte_512 >= 128).astype(np.uint8) * 255
         image, latent = encoder.encode(sketch_rgb_new)
+        st.image(sketch_rgb_new)
         pil_new = Image.fromarray(sketch_rgb_new)
         resized_pil_new = pil_new.resize((1024, 1024), Image.LANCZOS)
         I_new, W_new = ii2s.invert_image_in_W_without_path(resized_pil_new, init_latent=latent)
@@ -586,7 +587,7 @@ for step in pbar:
     latent_mixed = interpolation_latent
     
     I_G, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_mixed)
-    if run_opt or edit_mode == "Hair Line Editing":
+    if run_opt or edit_mode == "Hair Mask Editing":
         I_G_color, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_hair)
     
     im_dict['gen_im'] = blend.downsample_256(I_G)
@@ -598,7 +599,7 @@ for step in pbar:
     H2_region = im_dict['im_3'] * im_dict['mask_hair']
     style_loss = loss_builder.style_loss(H2_region, H1_region, im_dict['mask_hair'], im_dict['mask_2_hair'])
 
-    if run_opt or edit_mode == "Hair Line Editing":
+    if run_opt or edit_mode == "Hair Mask Editing":
         hair_loss = loss_builder._loss_hair_percept(blend.downsample_256(I_G_color), im_dict['im_3'], im_dict['mask_hair'])
     else :
         hair_loss = loss_builder._loss_hair_percept(im_dict['gen_im'], im_dict['im_3'], im_dict['mask_hair'])
