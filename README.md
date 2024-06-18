@@ -28,19 +28,20 @@ conda create -n HairTrans python=3.10
 conda activate HairTrans
 ```
 
-- Install packages with `pip`:
-```
-pip install -r requirements.txt
-```
-
 - Clone the repository:
 ``` 
 git clone https://github.com/korfriend/VividHairStyler.git
 cd VividHairStyler
 ```
 
+- Install packages with `pip`:
+```
+pip install -r requirements.txt
+```
+
+
 ## Download sample images
-Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/Database/ffhq` directory.
+Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/${PROJECT_ROOT}/database/ffhq` directory.
 
 
 ## Getting Started  
@@ -48,7 +49,7 @@ Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDK
 ### Prerequisites
 ```
 $ pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
-
+$ pip install --upgrade diffusers[torch]
 ```
 
 ### Download pretrained models
