@@ -224,7 +224,6 @@ model_progress.progress(100, text="Loading models...")
 model_progress.empty()
 
 ########### Configuring the Hair Transfer interface ###########
-st.sidebar.header("Sketch")
 st.title("Hair Transfer")
 run_opt = st.button('All decided')
 
@@ -292,8 +291,6 @@ selected_filenames = st.session_state.selected_filenames
 I_src_rgb, I_sref_rgb, I_aref_rgb = images
 I_src_rgb_temp = I_src_rgb
 
-st.write(st.session_state.selected_filenames)
-
 M_src = get_mask_dict(im=images[0], mask=None, embedding=ii2s)
 M_sref = get_mask_dict(im=images[1], mask=None, embedding=ii2s)
 M_aref = get_mask_dict(im=images[2], mask=None, embedding=ii2s)
@@ -301,6 +298,7 @@ M_aref = get_mask_dict(im=images[2], mask=None, embedding=ii2s)
 ########### Configuring the Hair Editing interface ###########
 st.title("Hair Editing")
 sketch_completed = st.button('Sketch Completed')
+st.sidebar.header("Sketch")
 
 edit_mode = st.radio(
     "Choose editing mode:", 
@@ -381,13 +379,15 @@ W_src, F7_src = latents[0].clone(), Fs[0].clone()
 W_sref, F7_sref = latents[1].clone(), Fs[1].clone()
 W_aref, F7_aref = latents[2].clone(), Fs[2].clone()
 
-I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_src_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
-I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_aref_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
 align = Alignment(args, embedding=ii2s)
 
 
 if run_opt:
+    I_src_rgb = I_src_rgb_temp
+    I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_src_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
+    I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_aref_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
+
     src_kp_hm = align.kp_extractor.face_alignment_net(I_1)
 
     #region Alignment
@@ -405,8 +405,9 @@ if run_opt:
     bald_module = Bald(args.bald_model_path)
     W_src_bald = bald_module.make_bald(W_src)
     del bald_module
-    I_src_rgb = I_src_rgb_temp
+    
     I_glign_1_2, F7_blend_1_2, warped_latent_2, bald_seg_target1, target_mask, HM_1_2 =  align.align_images(I_src_rgb, I_sref_rgb, F7_src, W_src, W_sref, W_src_bald, smooth=args.smooth)
+    st.image(ii2s.tensor_to_numpy(I_glign_1_2))
     #endregion  
 
     # mask

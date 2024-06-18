@@ -33,7 +33,7 @@ pip install -r requirements.txt
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/Database/ffhq` directory.
 
 ## Download pretrained models
-Clone the the pretrained models into `/checkpoints` directory :
+Clone the the pretrained models into `/${PROJECT_ROOT}/pretrained_models` directory :
 
 | Model | Description
 | :--- | :----------
@@ -42,6 +42,34 @@ Clone the the pretrained models into `/checkpoints` directory :
 |[Face Landmark Model](https://drive.google.com/file/d/1c-SgUUQj0X1mIl-W-_2sMboI2QS7GzfK/view?usp=drive_link) | Used to align unprocessed images.
 |[Image Invert Model](https://drive.google.com/file/d/1cUv_reLE6k3604or78EranS7XzuVMWeO/view?usp=sharing) | Pretrained image embedding model taken from [encoder4editing](https://github.com/omertov/encoder4editing)
 |[Sketch2Image Model](https://drive.google.com/file/d/1XiJbvWxzDCZaA-p1s6BWKasIMVlHcOrx/view?usp=sharing) | Pretrained image embedding model taken from [SketchHairSalon](https://github.com/chufengxiao/SketchHairSalon/)
+
+Finally, these pretrained models should be organized as follows:
+```
+./pretrained_models/
+├── afhqcat_PCA.npz
+├── afhqdog_PCA.npz
+├── afhqwild_PCA.npz
+├── e4e_ffhq_encode.pt
+├── face_parsing.pth
+├── ffhq_PCA.npz
+├── ffhq.pt
+├── final
+│   └── best_model.pt
+├── metfaces_PCA.npz
+├── model_ir_se50.pth
+├── S2I_braid
+│   ├── 400_net_D.pth
+│   └── 400_net_G.pth
+├── S2I_unbraid
+│   ├── 200_net_D.pth
+│   └── 200_net_G.pth
+├── S2M
+│   ├── 200_net_D.pth
+│   └── 200_net_G.pth
+├── seg.pth
+├── StyleGAN2-ada-Generator.pth
+└── vgg16.pth
+```
 
 ## Getting Started  
 Preparing...
