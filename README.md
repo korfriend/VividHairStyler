@@ -15,19 +15,28 @@ Official Implementation of "FS Code Style Transfer". **KEEP UPDATING! Please Git
 `2024/06/07` All source codes have been uploaded
 
 ## Installation
-- Clone the repository:
-``` 
-git clone https://github.com/korfriend/VividHairStyler.git
-cd VividHairStyler
-```
+- System requirement: Ubuntu22.04/Windows 11, Cuda 12.3
+- Tested GPUs: RTX4090
+
 - Dependencies:  
 We recommend running this repository using [Anaconda](https://docs.anaconda.com/anaconda/install/). 
 All dependencies for defining the environment are provided in `environment.yaml`.
 
-- Python environment
-Alternatively, you can set up the Python environment using `pip`:
+- Create conda environment:
+```
+conda create -n HairTrans python=3.10
+conda activate HairTrans
+```
+
+- Install packages with `pip`:
 ```
 pip install -r requirements.txt
+```
+
+- Clone the repository:
+``` 
+git clone https://github.com/korfriend/VividHairStyler.git
+cd VividHairStyler
 ```
 
 ## Download sample images
