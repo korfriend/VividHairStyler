@@ -9,7 +9,7 @@ import cv2
 import glob
 import torchvision.transforms as transforms
 from PIL import Image
-from src.models.Trimap import Trimap
+# from src.models.Trimap import Trimap
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
