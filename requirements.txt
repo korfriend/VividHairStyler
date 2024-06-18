@@ -23,7 +23,6 @@ defusedxml==0.7.1
 diffusers==0.21.4
 dill==0.3.7
 dlib==19.24.2
-docker-pycreds==0.4.0
 dominate==2.9.1
 entrypoints==0.4
 exceptiongroup==1.2.0
@@ -85,11 +84,7 @@ networkx==2.6.3
 notebook==6.5.6
 notebook_shim==0.2.3
 numba==0.56.4
-numpy==1.19.2
-nvidia-cublas-cu11==11.10.3.66
-nvidia-cuda-nvrtc-cu11==11.7.99
-nvidia-cuda-runtime-cu11==11.7.99
-nvidia-cudnn-cu11==8.5.0.96
+numpy==1.22.1
 oauthlib==3.2.2
 opencv-python==4.9.0.80
 packaging==23.2
