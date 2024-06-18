@@ -1,6 +1,8 @@
 import os
 import sys
 sys.path.insert(0, 'src')
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src/models'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src/models/FBA_Matting'))
 
 import numpy as np
 import cv2

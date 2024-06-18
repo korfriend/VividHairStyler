@@ -1,9 +1,9 @@
 # img_path: 'test_data/origin/40854.png'
 
 # model path
-S2M: "checkpoints/S2M/200_net_G.pth"
-S2I: "checkpoints/S2I_unbraid/200_net_G.pth"
-e4e: "checkpoints/e4e_ffhq_encode.pt"
+S2M: "pretrained_models/S2M/200_net_G.pth"
+S2I: "pretrained_models/S2I_unbraid/200_net_G.pth"
+e4e: "pretrained_models/e4e_ffhq_encode.pt"
 
 data_dir: "test_data"
 
@@ -15,7 +15,7 @@ delay: 0.25
 device: cuda
 
 # for hair mapper
-bald_model_path: checkpoints/final/best_model.pt
+bald_model_path: pretrained_models/final/best_model.pt
 learning_rate: 0.01
 num_iterations: 100
 loss_weight_feat: 3e-5
@@ -30,7 +30,7 @@ truncation_psi: 0.75
 ## for barbershop
 # StyleGAN2 setting
 size: 1024
-ckpt: checkpoints/ffhq.pt
+ckpt: pretrained_models/ffhq.pt
 channel_multiplier: 2
 latent: 512
 n_mlp: 8
@@ -53,7 +53,7 @@ lr_schedule: fixed
 save_intermediate: False
 save_interval: 300
 verbose: False
-seg_ckpt: checkpoints/seg.pth
+seg_ckpt: pretrained_models/seg.pth
 
 sign: realistic
 smooth: 5

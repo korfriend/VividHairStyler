@@ -4,12 +4,12 @@ import sys
 import gdown
 import torch
 
+sys.path.append(os.path.join(os.path.dirname(__file__), 'FBA_Matting'))
+
 import numpy as np
 import matplotlib.pyplot as plt
-
-from src.models.FBA_Matting.demo import np_to_torch, pred, scale_input
-from src.models.FBA_Matting.dataloader import read_image, read_trimap
-from src.models.FBA_Matting.networks.models import build_model
+from models.FBA_Matting.demo import pred
+from models.FBA_Matting.networks.models import build_model
 import torch
 import numpy as np
 import sys

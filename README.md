@@ -39,6 +39,12 @@ cd VividHairStyler
 pip install -r requirements.txt
 ```
 
+- ClongFBA Matting
+```
+git submodule init
+git submodule update
+```
+
 
 ## Download sample images
 Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDKccyo300YXCJ8EvZSaIL) and put them in the `/${PROJECT_ROOT}/database/ffhq` directory.
