@@ -217,38 +217,3 @@ def get_mask_dict(im, mask=None, embedding=None, device="cuda", kernel_size=50, 
         M_dict['tensor'][size] = M_tensor # torch.from_numpy(M_trimap).unsqueeze(0).unsqueeze(0).float().to(device)
 
     return M_dict
-
-def get_mask_dict_backup(mask=None, im=None, get_hair_mask=None, net=None, device="cuda", kernel_size=0):
-    trimap = Trimap()
-    if mask is None:
-        # im_rgb_512 = cv2.resize(im_rgb, (512, 512))
-        M3_512 = get_hair_mask(img_path=im, net=net, include_hat=True, include_ear=False, dilate_kernel=dilate_kernel)
-        M_512 = cv2.cvtColor(M3_512, cv2.COLOR_RGB2GRAY)
-    else:
-        if mask.ndim == 3:
-            M_512 = cv2.cvtColor(M3_512, cv2.COLOR_RGB2GRAY)
-        else:
-            M_512 = mask.copy()
-    M_1024 = cv2.resize(M_512, (1024, 1024))
-    _, _, tirmap_result = trimap.mask_to_trimap(im, M_1024, kernel_size=kernel_size)
-    # print(np.max(tirmap_result)) # 1.0
-    tirmap_result = (tirmap_result*1.5*255).clip(0, 255).astype(np.uint8)
-    del trimap
-
-    M_dict = {
-        'numpy': {}, 
-        'tensor': {}, 
-        'trimap': {}
-    }
-    for size in [32, 64, 128, 256, 512, 1024]:
-        M_numpy = cv2.resize(M_512, (size, size))
-        M_dict['numpy'][size] = M_numpy
-
-        M_trimap = cv2.resize(tirmap_result, (size, size))
-        M_dict['trimap'][size] = M_trimap
-
-        M_tensor = torch.from_numpy(M_numpy/255.0).unsqueeze(0).unsqueeze(0).float().to(device)
-        M_dict['tensor'][size] = M_tensor # torch.from_numpy(M_trimap).unsqueeze(0).unsqueeze(0).float().to(device)
-
-    return M_dict
-
