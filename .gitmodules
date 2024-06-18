@@ -1,0 +1,3 @@
+[submodule "src/models/FBA_Matting"]
+    path = src/models/FBA_Matting
+    url = https://github.com/username/FBA_Matting.git
