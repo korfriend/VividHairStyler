@@ -5,6 +5,7 @@ import numpy as np
 import os
 from functools import partial
 from src.utils.bicubic import BicubicDownSample
+
 from .face_parsing.model import BiSeNet, seg_mean, seg_std
 from src.datasets.image_dataset import ImagesDataset
 from src.losses.embedding_loss import EmbeddingLossBuilder
@@ -13,8 +14,8 @@ from tqdm import tqdm
 from PIL import Image
 # import torchvision
 import torchvision.transforms as transforms
-from src.utils.data_utils import convert_npy_code
-from src.utils.data_utils import load_image, load_latent_W
+from ..utils.data_utils import convert_npy_code, load_image, load_latent_W
+from ..utils.model_utils import download_weight
 toPIL = transforms.ToPILImage()
 
 class Embedding(nn.Module):
@@ -59,7 +60,10 @@ class Embedding(nn.Module):
         self.seg = BiSeNet(n_classes=16)
         self.seg.to(self.opts.device)
 
-        assert os.path.exists(self.opts.seg_ckpt), "seg ckpt 확인."
+
+        if not os.path.exists(self.opts.seg_ckpt):
+            download_weight(self.opts.seg_ckpt)
+        # assert os.path.exists(self.opts.seg_ckpt), "seg ckpt 확인."
 
         self.seg.load_state_dict(torch.load(self.opts.seg_ckpt))
         for param in self.seg.parameters():
