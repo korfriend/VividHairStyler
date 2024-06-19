@@ -438,8 +438,8 @@ if run_opt:
     }
 
 
-elif sketch_completed :
-    if edit_mode == "Hair Mask Editing" and user_mask is not None :
+elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
+    if edit_mode == "Hair Mask Editing" :
         bald_module = Bald(args.bald_model_path)
         W_src_bald = bald_module.make_bald(W_src)
 
@@ -484,8 +484,6 @@ elif sketch_completed :
             F_hair = F7_src.clone()
             interpolation_latent = W_src.detach().clone().requires_grad_(True)
          
-        st.image(ii2s.tensor_to_numpy(over_mask))
-        # st.image(user_mask*255)
 
         with torch.no_grad():
             HM_newD, HM_newE = align.dilate_erosion(new_hair_mask, device)
