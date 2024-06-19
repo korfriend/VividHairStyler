@@ -483,9 +483,8 @@ elif sketch_completed :
 
             F_hair = F7_src.clone()
             interpolation_latent = W_src.detach().clone().requires_grad_(True)
-            
-        # over_mask_resized = F.interpolate(over_mask, size=(256,256), mode='area')  
-        # st.image(ii2s.tensor_to_numpy(over_mask_resized))
+         
+        st.image(ii2s.tensor_to_numpy(over_mask))
         # st.image(user_mask*255)
 
         with torch.no_grad():

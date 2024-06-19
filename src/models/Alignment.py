@@ -777,24 +777,16 @@ class Alignment():
         target_mask = generated_mask.unsqueeze(0).long()
 
         M_hair = (generated_mask == 10) * 1.0
-        _, M_hair = self.dilate_erosion(M_hair.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
-        M_hair_down_32 = F.interpolate(M_hair.float(), size=(32, 32), mode='area')
+        _, M_hairE = self.dilate_erosion(M_hair.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
+        M_hair_down_32 = F.interpolate(M_hairE.float(), size=(32, 32), mode='area')
 
         # user_mask_tensor = torch.from_numpy(user_mask).float().cuda()
-        user_mask_tensor = torch.from_numpy(user_mask).float().cuda()
-        overlapping_regions = M_1_hair * user_mask_tensor.float()
-        overlapping_regions, _ = self.dilate_erosion(overlapping_regions, device, dilate_erosion=smooth)
-        overlapping_regions_down_32 = F.interpolate(overlapping_regions.float(), size=(32, 32), mode='area')
-
-        not_M_1_hair = torch.logical_not(M_1_hair.bool()).float()
-        non_overlapping_regions = user_mask_tensor * not_M_1_hair
-        non_overlapping_regions, _ = self.dilate_erosion(non_overlapping_regions, device, dilate_erosion=smooth)
+        mask1_tensor = torch.from_numpy(mask1).float().cuda() * 255
+        non_overlapping_regions, _ = self.dilate_erosion(mask1_tensor.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
         non_overlapping_regions_down_32 = F.interpolate(non_overlapping_regions.float(), size=(32, 32), mode='area')
 
-
         mask2_tensor = torch.from_numpy(mask2).float().cuda()
-        overlapping_black_regions = M_1_hair * mask2_tensor.float()
-        overlapping_black_regions, _ = self.dilate_erosion(overlapping_black_regions, device, dilate_erosion=smooth)
+        overlapping_black_regions, _ = self.dilate_erosion(mask2_tensor.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
         overlapping_black_regions_down_32 = F.interpolate(overlapping_black_regions.float(), size=(32, 32), mode='area')
 
 
@@ -847,14 +839,12 @@ class Alignment():
         F_keep = latent_F_1.clone().detach()
         F_bald = bald_W.clone().detach()
         latent_F_mixed = F_keep + overlapping_black_regions_down_32* (F_bald - F_keep)
-        # latent_F_mixed = F_bald + M_hair_down_32* (F_keep - F_bald)
         latent_F_mixed = latent_F_mixed + non_overlapping_regions_down_32* (latent_F_out_new - latent_F_mixed)
-        # latent_F_mixed = latent_F_mixed + overlapping_regions_down_32* (F_keep - latent_F_mixed)
         result_im, _ = self.generator([latent_1], input_is_latent=True, return_latents=False, start_layer=4,
                             end_layer=8, layer_in=latent_F_mixed)
         
 
-        return result_im, latent_F_mixed, seg_target1, M_hair_down_32, overlapping_regions
+        return result_im, latent_F_mixed, seg_target1, M_hair_down_32, non_overlapping_regions
 
 
     """
