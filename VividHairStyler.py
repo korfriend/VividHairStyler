@@ -338,18 +338,12 @@ if edit_mode == "Hair Mask Editing":
             key="canvas2",
         )
         mask1 = canvas_result.image_data[:,:,0] > 127
-        st.image(mask1*255)
         mask2 = canvas_result.image_data[:,:,0] != 0
-        st.image(mask2*255)
         mask2 = np.logical_xor(mask1, mask2)
-        st.image(mask2*255)
 
         user_mask = np.where(mask1, 255, st.session_state.canvas_background2_mask)
-        st.image(user_mask)
         user_mask = np.where(mask2, 0, user_mask)
-        st.image(user_mask)
         user_mask = user_mask > 0
-        st.image(user_mask*255)
         Image.fromarray(user_mask).save(os.path.join(output_dir,"user_mask.png"))
 
 elif edit_mode == "Hair Strain Editing":
@@ -407,7 +401,6 @@ if run_opt:
     del bald_module
     
     I_glign_1_2, F7_blend_1_2, warped_latent_2, bald_seg_target1, target_mask, HM_1_2 =  align.align_images(I_src_rgb, I_sref_rgb, F7_src, W_src, W_sref, W_src_bald, smooth=args.smooth)
-    st.image(ii2s.tensor_to_numpy(I_glign_1_2))
      
 
     # mask
@@ -491,7 +484,6 @@ elif sketch_completed :
             F_hair = F7_src.clone()
             interpolation_latent = W_src.detach().clone().requires_grad_(True)
             
-        st.image(ii2s.tensor_to_numpy(I_glign_line))
         # over_mask_resized = F.interpolate(over_mask, size=(256,256), mode='area')  
         # st.image(ii2s.tensor_to_numpy(over_mask_resized))
         # st.image(user_mask*255)
@@ -508,9 +500,9 @@ elif sketch_completed :
             HM_X = F.interpolate(HM_X.unsqueeze(0), size=(256, 256), mode='nearest').squeeze()
             HM_XD, _ = align.cuda_unsqueeze(align.dilate_erosion_mask_tensor(HM_X), device)
             target_mask = (1 - HM_1D) * (1 - HM_newD) * (1 - HM_XD)
-        st.image(ii2s.tensor_to_numpy(target_mask))
-        st.image(ii2s.tensor_to_numpy(HM_1D))
-        st.image(ii2s.tensor_to_numpy(HM_newE))
+        # st.image(ii2s.tensor_to_numpy(target_mask))
+        # st.image(ii2s.tensor_to_numpy(HM_1D))
+        # st.image(ii2s.tensor_to_numpy(HM_newE))
         
         im_dict = {
             'im_1': I_1,
@@ -552,8 +544,8 @@ elif sketch_completed :
         pil_new = Image.fromarray(sketch_rgb_mean)
         resized_pil_new = pil_new.resize((1024, 1024), Image.LANCZOS)
         I_new, W_new = ii2s.invert_image_in_W_without_path(resized_pil_new, init_latent=latent)
-        st.image(sketch_rgb_new)
-        st.image(ii2s.tensor_to_numpy(I_new))
+        # st.image(sketch_rgb_new)
+        # st.image(ii2s.tensor_to_numpy(I_new))
         sketch_seg_mask = ii2s.get_seg(I_new, target=None)
         sketch_target1 = torch.argmax(sketch_seg_mask, dim=1).long()
         sketch_target1 = sketch_target1[0].byte()
@@ -593,7 +585,7 @@ elif sketch_completed :
         hair_mask = HM_1D + new_hair_mask
         HM_newD, HM_newE = align.dilate_erosion(hair_mask.float(), device)
         downsampled_hair_mask = F.interpolate(HM_newE, size=(256, 256), mode='bilinear', align_corners=False)
-        st.image(ii2s.tensor_to_numpy(HM_newD))
+        # st.image(ii2s.tensor_to_numpy(HM_newD))
         im_dict = {
             'im_1': I_1,
             'im_3': I_3,
