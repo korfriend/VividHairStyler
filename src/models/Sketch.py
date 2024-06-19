@@ -6,7 +6,7 @@ import tqdm
 
 import sys
 
-from .models.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator
+from .models2.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator
 import torchvision.transforms.functional as tf
 
 
