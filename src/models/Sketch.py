@@ -6,9 +6,7 @@ import tqdm
 
 import sys
 
-sys.path.append('./SketchHairSalon')
-
-from src.models2.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator
+from .models.Unet_At_Bg import UnetAtGenerator, UnetAtBgGenerator
 import torchvision.transforms.functional as tf
 
 
