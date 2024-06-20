@@ -786,8 +786,8 @@ class Alignment():
         non_overlapping_regions_down_32 = F.interpolate(non_overlapping_regions.float(), size=(32, 32), mode='area')
 
         mask2_tensor = torch.from_numpy(mask2).float().cuda()
-        overlapping_black_regions, _ = self.dilate_erosion(mask2_tensor.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
-        overlapping_black_regions_down_32 = F.interpolate(overlapping_black_regions.float(), size=(32, 32), mode='area')
+        # overlapping_black_regions, _ = self.dilate_erosion(mask2_tensor.unsqueeze(0).unsqueeze(0), device, dilate_erosion=smooth)
+        overlapping_black_regions_down_32 = F.interpolate(mask2_tensor.float().unsqueeze(0).unsqueeze(0), size=(32, 32), mode='area')
 
 
         optimizer_align, latent_align_1 = self.setup_align_optimizer(latent_in=latent_1)
