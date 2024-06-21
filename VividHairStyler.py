@@ -546,29 +546,29 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         Image.fromarray(ii2s.tensor_to_numpy(gen_im)).save(os.path.join(output_dir, "enverted hair patch2.png"))
         # st.image(ii2s.tensor_to_numpy(I_new))
 
-        # sketch_seg_mask = ii2s.get_seg(I_new, target=None)
-        # sketch_target1 = torch.argmax(sketch_seg_mask, dim=1).long()
-        # sketch_target1 = sketch_target1[0].byte()
-        # sketch_hair_mask = torch.where(sketch_target1 == 10, torch.ones_like(sketch_target1), torch.zeros_like(sketch_target1))
-        # new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() * sketch_hair_mask.cpu()
-        # new_hair_mask, _ = align.dilate_erosion(new_hair_mask.unsqueeze(0).unsqueeze(0), device)
-        # new_hair_mask_down_32 = F.interpolate(new_hair_mask.float(), size=(32, 32), mode='area')[0]
-
-        # F_sketch, _ = ii2s.generator([W_new], input_is_latent=True, return_latents=False,
-        #                         start_layer=0, end_layer=3)
-
-        # FS test
-        _, latent2 = encoder.encode(sketch_rgb_mean)
-        pil_new2 = Image.fromarray(sketch_rgb_mean)
-        resized_pil_new2 = pil_new2.resize((1024, 1024), Image.LANCZOS)
-        I_new2, W_new2 = ii2s.invert_image_in_W_without_path(resized_pil_new2, init_latent=latent2, iter=200)
-        gen_im2, latent_S2, latent_F2 = ii2s.invert_image_in_FS(resized_pil_new2, W_init=W_new2)
-       
-        new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() 
+        sketch_seg_mask = ii2s.get_seg(I_new, target=None)
+        sketch_target1 = torch.argmax(sketch_seg_mask, dim=1).long()
+        sketch_target1 = sketch_target1[0].byte()
+        sketch_hair_mask = torch.where(sketch_target1 == 10, torch.ones_like(sketch_target1), torch.zeros_like(sketch_target1))
+        new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() * sketch_hair_mask.cpu()
         new_hair_mask, _ = align.dilate_erosion(new_hair_mask.unsqueeze(0).unsqueeze(0), device)
         new_hair_mask_down_32 = F.interpolate(new_hair_mask.float(), size=(32, 32), mode='area')[0]
 
-        F_sketch=latent_F2.clone()
+        F_sketch, _ = ii2s.generator([W_new], input_is_latent=True, return_latents=False,
+                                start_layer=0, end_layer=3)
+
+        # FS test
+        # _, latent2 = encoder.encode(sketch_rgb_mean)
+        # pil_new2 = Image.fromarray(sketch_rgb_mean)
+        # resized_pil_new2 = pil_new2.resize((1024, 1024), Image.LANCZOS)
+        # I_new2, W_new2 = ii2s.invert_image_in_W_without_path(resized_pil_new2, init_latent=latent2, iter=200)
+        # gen_im2, latent_S2, latent_F2 = ii2s.invert_image_in_FS(resized_pil_new2, W_init=W_new2)
+       
+        # new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() 
+        # new_hair_mask, _ = align.dilate_erosion(new_hair_mask.unsqueeze(0).unsqueeze(0), device)
+        # new_hair_mask_down_32 = F.interpolate(new_hair_mask.float(), size=(32, 32), mode='area')[0]
+
+        # F_sketch=latent_F2.clone()
         # F_hair=latent_F2.clone()
 
         I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(st.session_state.canvas_background).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
