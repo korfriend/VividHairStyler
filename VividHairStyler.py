@@ -524,7 +524,6 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         mask_indices = resized_mask.astype(bool)
         mean_color = hair_region_np[mask_indices].mean(axis=0)
         mean_color = (mean_color * 255).astype(np.uint8)
-
         sketch_mask = ~np.all(sketch_rgb == [0, 0, 0], axis=-1)
         sketch_mean = np.full((512, 512, 3), [0, 0, 0], dtype=np.uint8)
         sketch_mean[sketch_mask] = mean_color
@@ -533,56 +532,63 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         matte_512, sketch_rgb_new = SHS.get_matte_and_image(sketch_rgb, background=I_bg_rgb)
         matte_512 , sketch_rgb_mean = SHS.get_matte_and_image(sketch_mean, background=I_bg_rgb)
         del SHS
+        save_tensor_as_image(sketch_rgb_new, os.path.join(output_dir, "hair patch.png"))
+        save_tensor_as_image(sketch_rgb_mean, os.path.join(output_dir, "hair patch_mean.png"))
 
         binary_sketch_mask = (matte_512 >= 128).astype(np.uint8) * 255
-        image, latent = encoder.encode(sketch_rgb_mean)
-
-        save_tensor_as_image(sketch_rgb_mean, os.path.join(output_dir, "hair patch.png"))
-        pil_new = Image.fromarray(sketch_rgb_mean)
+        _, latent = encoder.encode(sketch_rgb_new)
+        pil_new = Image.fromarray(sketch_rgb_new)
         resized_pil_new = pil_new.resize((1024, 1024), Image.LANCZOS)
-        I_new, W_new = ii2s.invert_image_in_W_without_path(resized_pil_new, init_latent=latent)
-        # st.image(sketch_rgb_new)
+        I_new, W_new = ii2s.invert_image_in_W_without_path(resized_pil_new, init_latent=latent, iter=200)
+        gen_im, latent_S, latent_F = ii2s.invert_image_in_FS(resized_pil_new, W_init=W_new)
+        I_G, _ = ii2s.generator([latent_S], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=latent_F)
+        Image.fromarray(ii2s.tensor_to_numpy(I_new)).save(os.path.join(output_dir, "enverted hair patch.png"))
+        Image.fromarray(ii2s.tensor_to_numpy(gen_im)).save(os.path.join(output_dir, "enverted hair patch2.png"))
         # st.image(ii2s.tensor_to_numpy(I_new))
-        sketch_seg_mask = ii2s.get_seg(I_new, target=None)
-        sketch_target1 = torch.argmax(sketch_seg_mask, dim=1).long()
-        sketch_target1 = sketch_target1[0].byte()
-        sketch_hair_mask = torch.where(sketch_target1 == 10, torch.ones_like(sketch_target1), torch.zeros_like(sketch_target1))
-        new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() * sketch_hair_mask.cpu()
+
+        # sketch_seg_mask = ii2s.get_seg(I_new, target=None)
+        # sketch_target1 = torch.argmax(sketch_seg_mask, dim=1).long()
+        # sketch_target1 = sketch_target1[0].byte()
+        # sketch_hair_mask = torch.where(sketch_target1 == 10, torch.ones_like(sketch_target1), torch.zeros_like(sketch_target1))
+        # new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() * sketch_hair_mask.cpu()
+        # new_hair_mask, _ = align.dilate_erosion(new_hair_mask.unsqueeze(0).unsqueeze(0), device)
+        # new_hair_mask_down_32 = F.interpolate(new_hair_mask.float(), size=(32, 32), mode='area')[0]
+
+        # F_sketch, _ = ii2s.generator([W_new], input_is_latent=True, return_latents=False,
+        #                         start_layer=0, end_layer=3)
+
+        # FS test
+        _, latent2 = encoder.encode(sketch_rgb_mean)
+        pil_new2 = Image.fromarray(sketch_rgb_mean)
+        resized_pil_new2 = pil_new2.resize((1024, 1024), Image.LANCZOS)
+        I_new2, W_new2 = ii2s.invert_image_in_W_without_path(resized_pil_new2, init_latent=latent2, iter=200)
+        gen_im2, latent_S2, latent_F2 = ii2s.invert_image_in_FS(resized_pil_new2, W_init=W_new2)
+       
+        new_hair_mask = torch.from_numpy(binary_sketch_mask).cpu() 
         new_hair_mask, _ = align.dilate_erosion(new_hair_mask.unsqueeze(0).unsqueeze(0), device)
         new_hair_mask_down_32 = F.interpolate(new_hair_mask.float(), size=(32, 32), mode='area')[0]
 
-        F_sketch, _ = ii2s.generator([W_new], input_is_latent=True, return_latents=False,
-                                        start_layer=0, end_layer=3)
-        
+        F_sketch=latent_F2.clone()
+        # F_hair=latent_F2.clone()
+
+        I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(st.session_state.canvas_background).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
         I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(sketch_rgb_new).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
         
         if background_choice == "Result Image" and st.session_state.I_G_blend is not None :
-            result_img = st.session_state.I_G_blend
-            I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(result_img).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
-
-            result_seg_mask = ii2s.get_seg(Result_Image_path, target=None)
-            result_target1 = torch.argmax(result_seg_mask, dim=1).long()
-            result_target1 = result_target1[0].byte()
-            result_hair_mask = torch.where(result_target1==10, torch.ones_like(result_target1),torch.zeros_like(result_target1))
-            HM_1D, _ = align.dilate_erosion(result_hair_mask.unsqueeze(0).unsqueeze(0), device)
-
             result_S, result_F = load_FS_latent(Result_FS_path)
             F_mixed = result_F + new_hair_mask_down_32*(F_sketch-result_F)
-            # interpolation_latent = result_S.detach().clone().requires_grad_(True)
-            interpolation_latent = ((result_S) / 2).detach().clone().requires_grad_(True)
+            interpolation_latent = latent_S.detach().clone().requires_grad_(True)
 
         else :  
-            I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_src_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
             F_mixed = F7_src + new_hair_mask_down_32*(F_sketch-F7_src)
-            HM_1D, _ = align.dilate_erosion(M_src['tensor'][1024], device)
-            interpolation_latent = ((W_src) / 2).detach().clone().requires_grad_(True)
-
-            # interpolation_latent = W_src.detach().clone().requires_grad_(True)
-
+            interpolation_latent = latent_S.detach().clone().requires_grad_(True)
+        F_hair = F_mixed.clone()
+        
+        HM_1D, _ = align.dilate_erosion(torch.from_numpy(st.session_state.canvas_background2_mask).unsqueeze(0).unsqueeze(0), device)
         hair_mask = HM_1D + new_hair_mask
         HM_newD, HM_newE = align.dilate_erosion(hair_mask.float(), device)
-        downsampled_hair_mask = F.interpolate(HM_newE, size=(256, 256), mode='bilinear', align_corners=False)
-        # st.image(ii2s.tensor_to_numpy(HM_newD))
+        downsampled_hair_mask = F.interpolate(HM_newE, size=(256, 256), mode='area')
+        # st.image(ii2s.tensor_to_numpy(new_hair_mask))
         im_dict = {
             'im_1': I_1,
             'im_3': I_3,
@@ -613,8 +619,7 @@ if interpolation_latent is not None :
         latent_mixed = interpolation_latent
         
         I_G, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_mixed)
-        if run_opt or edit_mode == "Hair Mask Editing":
-            I_G_color, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_hair)
+        I_G_color, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_hair)
         
         im_dict['gen_im'] = blend.downsample_256(I_G)
 
@@ -624,25 +629,17 @@ if interpolation_latent is not None :
         H1_region = im_dict['gen_im'] * im_dict['mask_2_hair'] 
         H2_region = im_dict['im_3'] * im_dict['mask_hair']
         style_loss = loss_builder.style_loss(H2_region, H1_region, im_dict['mask_hair'], im_dict['mask_2_hair'])
-
-        if run_opt or edit_mode == "Hair Mask Editing":
-            hair_loss = loss_builder._loss_hair_percept(blend.downsample_256(I_G_color), im_dict['im_3'], im_dict['mask_hair'])
-        else :
-            hair_loss = loss_builder._loss_hair_percept(im_dict['gen_im'], im_dict['im_3'], im_dict['mask_hair'])
+        hair_loss = loss_builder._loss_hair_percept(blend.downsample_256(I_G_color), im_dict['im_3'], im_dict['mask_hair'])
 
         total_loss += face_loss + hair_loss + 5000 * style_loss
         opt_blend.zero_grad()
         total_loss.backward(retain_graph=True)
         opt_blend.step()
             
-        blend_progress.progress((step + 1) / 150, text=f"Blending in progress... ({step + 1}/150)")
+        blend_progress.progress((step + 1) / 150, text=f"Blending in progress... ({step + 1}/250)")
 
     blend_progress.empty()
-
-    # st.image(ii2s.tensor_to_numpy(im_dict['mask_hair']))
-    # st.image(ii2s.tensor_to_numpy(im_dict['mask_2_hair']))
     # st.image(ii2s.tensor_to_numpy(I_G_color))
-
     I_G_blend, _ = ii2s.generator([latent_mixed], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F_mixed)
     np.savez(Result_FS_path, latent_in=latent_mixed.detach().cpu().numpy(),
                 latent_F=F_mixed.detach().cpu().numpy())
@@ -651,13 +648,9 @@ if interpolation_latent is not None :
     st.session_state.I_G_blend = ii2s.tensor_to_numpy(I_G_blend)
     st.session_state.canvas_background = cv2.resize(st.session_state.I_G_blend, (512, 512))
     st.session_state.canvas_background2, st.session_state.canvas_background2_mask = make_hair_line_background(st.session_state.I_G_blend)
-
-    del blend, loss_builder
+    st.experimental_rerun()
+    del ii2s, blend, loss_builder
 #endregion
-
-
-del ii2s
-st.experimental_rerun()
 
 print('---Done!---')
 #endregion

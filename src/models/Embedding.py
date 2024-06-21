@@ -231,13 +231,13 @@ class Embedding(nn.Module):
         return gen_im.detach().clone(), latent_in.detach().clone()
 
 
-    def invert_image_in_W_without_path(self, image, init_latent=None, pbar=None):
+    def invert_image_in_W_without_path(self, image, init_latent=None, pbar=None, iter=100):
         ref_im_H = self.image_transform(image)
         ref_im_L = self.image_transform_256(image)
         device = self.opts.device
         optimizer_W, latent = self.setup_W_optimizer(init_latent)
         if pbar is None:
-            pbar = tqdm(range(100), desc='Embedding', leave=False)
+            pbar = tqdm(range(iter), desc='Embedding', leave=False)
         else:
             pbar.reset(total=self.opts.W_steps)
         for step in pbar:
