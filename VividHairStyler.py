@@ -337,14 +337,7 @@ if edit_mode == "Hair Mask Editing":
             point_display_radius=0,
             key="canvas2",
         )
-        mask1 = canvas_result.image_data[:,:,0] > 127
-        mask2 = canvas_result.image_data[:,:,0] != 0
-        mask2 = np.logical_xor(mask1, mask2)
 
-        user_mask = np.where(mask1, 255, st.session_state.canvas_background2_mask)
-        user_mask = np.where(mask2, 0, user_mask)
-        user_mask = user_mask > 0
-        Image.fromarray(user_mask).save(os.path.join(output_dir,"user_mask.png"))
 
 elif edit_mode == "Hair Strain Editing":
     stroke_width = col2.slider("Stroke width (structure): ", 1, 100, 5, key="structure_editing_stroke_width")
@@ -432,6 +425,16 @@ if run_opt:
 
 elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
     if edit_mode == "Hair Mask Editing" :
+        mask1 = canvas_result.image_data[:,:,0] > 127
+        mask2 = canvas_result.image_data[:,:,0] != 0
+        mask2 = np.logical_xor(mask1, mask2)
+
+        user_mask = np.where(mask1, 255, st.session_state.canvas_background2_mask)
+        user_mask = np.where(mask2, 0, user_mask)
+        user_mask = user_mask > 0
+        Image.fromarray(user_mask).save(os.path.join(output_dir,"user_mask.png"))
+
+
         bald_module = Bald(args.bald_model_path)
         W_src_bald = bald_module.make_bald(W_src)
 
