@@ -23,7 +23,7 @@ class Encoder():
         decoder = None
     ) -> None:
         if not os.path.exists(model_path):
-            download_weight(self.opts.ckpt)
+            download_weight(model_path)
 
         ckpt = torch.load(model_path, map_location='cpu')
         opts = ckpt['opts']
