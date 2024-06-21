@@ -46,7 +46,7 @@ class Encoder():
         if isinstance(path, str):
             image = Image.open(path)
         elif isinstance(path, np.ndarray):
-            image = Image.fromarray(path)
+            image = Image.fromarray(path).convert("RGB")
         elif isinstance(path, (Image)):
             image = path
         else:

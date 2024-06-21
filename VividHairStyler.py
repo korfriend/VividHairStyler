@@ -451,6 +451,9 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         bald_target1 = bald_target1[0].byte()
         new_bald_seg = torch.where(torch.from_numpy(user_mask).to(device)==1, 10 * torch.ones_like(bald_target1), bald_target1)
 
+        I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(st.session_state.canvas_background).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
+            
+
         if background_choice == "Result Image" and st.session_state.I_G_blend is not None :
             I_glign_line, F7_blend_line, HM_line, new_hair_mask, over_mask = align.Hair_Line_editing(new_bald_seg, M_src['tensor'][512] * 255, user_mask, mask1, mask2, F7_bald, Result_FS_path, smooth=args.smooth)
             I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(ii2s.tensor_to_numpy(I_glign_line)).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
@@ -459,7 +462,7 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
             result_S, result_F = load_FS_latent(Result_FS_path)
 
             result_img = st.session_state.I_G_blend
-            I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(result_img).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
+            # I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(result_img).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
             result_seg_mask = ii2s.get_seg(Result_Image_path, target=None)
             result_target1 = torch.argmax(result_seg_mask, dim=1).long()
@@ -478,7 +481,6 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
             I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(ii2s.tensor_to_numpy(I_glign_line)).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
             F_mixed = F7_blend_line
 
-            I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_src_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
             HM_1D, _ = align.dilate_erosion(M_src['tensor'][1024], device)
 
             F_hair = F7_src.clone()
@@ -636,7 +638,7 @@ if interpolation_latent is not None :
         total_loss.backward(retain_graph=True)
         opt_blend.step()
             
-        blend_progress.progress((step + 1) / 150, text=f"Blending in progress... ({step + 1}/250)")
+        blend_progress.progress((step + 1) / 150, text=f"Blending in progress... ({step + 1}/150)")
 
     blend_progress.empty()
     # st.image(ii2s.tensor_to_numpy(I_G_color))

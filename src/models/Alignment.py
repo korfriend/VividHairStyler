@@ -773,6 +773,7 @@ class Alignment():
         device = self.device
 
         latent_1, latent_F_1 = load_FS_latent(latent_FS_path_1, device)
+        self.save_vis_mask('img_path1', 'img_path2', generated_mask.cpu(), self.save_dir, count='Edited_mask_with_sketch')
 
         target_mask = generated_mask.unsqueeze(0).long()
 
