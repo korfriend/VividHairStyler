@@ -58,12 +58,12 @@ Clone the the pretrained models into `/${PROJECT_ROOT}/pretrained_models` direct
 
 | Model | Description |
 | :--- | :---------- |
-| [FFHQ StyleGAN](https://drive.google.com/file/d/1g8S81ZybmrF86OjvjLYJzx-wx83ZOiIw/view?usp=drive_link) | StyleGAN model pretrained on FFHQ with 1024x1024 output resolution. This includes `ffhq_PCA.npz` and `ffhq.pt`, which are automatically downloaded. |
-| [Face Parser Model (BiSeNet)](https://drive.google.com/file/d/1OG6t7q4PpHOoYNdP-ipoxuqYbfMSgPta/view?usp=drive_link) | Pretrained face parse model taken from [Barbershop](https://github.com/ZPdesu/Barbershop/). This model file is `seg.pth`, which is automatically downloaded. |
+| [FFHQ StyleGAN](https://drive.google.com/file/d/1g8S81ZybmrF86OjvjLYJzx-wx83ZOiIw/view?usp=drive_link) | StyleGAN model pretrained on FFHQ with 1024x1024 output resolution. This includes `ffhq_PCA.npz` and `ffhq.pt`, which will be automatically downloaded. |
+| [Face Parser Model (BiSeNet)](https://drive.google.com/file/d/1OG6t7q4PpHOoYNdP-ipoxuqYbfMSgPta/view?usp=drive_link) | Pretrained face parse model taken from [Barbershop](https://github.com/ZPdesu/Barbershop/). This model file is `seg.pth`, which will be automatically downloaded. |
 | [Face Landmark Model](https://drive.google.com/file/d/1c-SgUUQj0X1mIl-W-_2sMboI2QS7GzfK/view?usp=drive_link) | Used to align unprocessed images. |
-| [FFHQ Inversion Model](https://drive.google.com/file/d/1cUv_reLE6k3604or78EranS7XzuVMWeO/view?usp=sharing) | Pretrained image embedding model taken from [encoder4editing](https://github.com/omertov/encoder4editing). This model file is `e4e_ffhq_encode.pt`, which is automatically downloaded. |
-| [Sketch2Image Model](https://drive.google.com/file/d/1XiJbvWxzDCZaA-p1s6BWKasIMVlHcOrx/view?usp=sharing) | Pretrained sketch hair model taken from [SketchHairSalon](https://github.com/chufengxiao/SketchHairSalon/). This includes `400_net_D.pth`, `400_net_G.pth` for `S2I_braid`, `200_net_D.pth`, `200_net_G.pth` for `S2I_unbraid`, and `200_net_D.pth`, `200_net_G.pth` for `S2M`, which must be manually downloaded and placed in `/${PROJECT_ROOT}/pretrained_models`. |
-| [HairMapper](https://github.com/oneThousand1000/HairMapper?tab=readme-ov-file#models) | Pretrained removing hair model taken from [HairMapper](https://github.com/oneThousand1000/HairMapper) (You can get it by filling out their Google form for pre-trained models access). This model file is `best_model.pt` located in the `final` folder, which must be manually downloaded and placed in `/${PROJECT_ROOT}/pretrained_models`. |
+| [FFHQ Inversion Model](https://drive.google.com/file/d/1cUv_reLE6k3604or78EranS7XzuVMWeO/view?usp=sharing) | Pretrained image embedding model taken from [encoder4editing](https://github.com/omertov/encoder4editing). This model file is `e4e_ffhq_encode.pt`, which will be automatically downloaded. |
+| [Sketch2Image Model](https://drive.google.com/file/d/1XiJbvWxzDCZaA-p1s6BWKasIMVlHcOrx/view?usp=sharing) | Pretrained sketch hair model taken from [SketchHairSalon](https://github.com/chufengxiao/SketchHairSalon/). This includes `400_net_D.pth`, `400_net_G.pth` for `S2I_braid`, `200_net_D.pth`, `200_net_G.pth` for `S2I_unbraid`, and `200_net_D.pth`, `200_net_G.pth` for `S2M`. These pretrained files need to be manually downloaded and placed in `/${PROJECT_ROOT}/pretrained_models`. |
+| [HairMapper](https://github.com/oneThousand1000/HairMapper?tab=readme-ov-file#models) | Pretrained removing hair model taken from [HairMapper](https://github.com/oneThousand1000/HairMapper) (You can get it by filling out their Google form for pre-trained models access). This model file is `best_model.pt` located in the `final` folder. This pretrained file needs to be manually downloaded and placed in `/${PROJECT_ROOT}/pretrained_models`. |
 
 ### Model Organization
 
@@ -72,9 +72,9 @@ The pretrained models should be organized as follows:
 
 ```
 ./pretrained_models/
-├── e4e_ffhq_encode.pt (Automatic download)
-├── ffhq_PCA.npz (Automatic download)
-├── ffhq.pt (Automatic download)
+├── e4e_ffhq_encode.pt (will be downloaded when running)
+├── ffhq_PCA.npz (will be downloaded when running)
+├── ffhq.pt (will be downloaded when running)
 ├── final
 │   └── best_model.pt 
 ├── S2I_braid
@@ -86,7 +86,7 @@ The pretrained models should be organized as follows:
 ├── S2M
 │   ├── 200_net_D.pth 
 │   └── 200_net_G.pth 
-└── seg.pth (Automatic download)
+└── seg.pth (will be downloaded when running)
 ```
 
 ### Web UI
