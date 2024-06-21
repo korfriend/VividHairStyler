@@ -470,6 +470,8 @@ class Alignment():
             target_mask = new_target.unsqueeze(0).long().to(self.opts.device)
 
         self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(),self.save_dir, count='2_final_target_seg')
+        W_latent_path = os.path.join(self.save_dir, 'warped_latent_2')
+        np.save(W_latent_path, warped_latent_2.detach().cpu().numpy())
 
         #####################  Save Visualization of Target Segmentation Mask
         hair_mask_target = torch.where(target_mask == 10, torch.ones_like(target_mask), torch.zeros_like(target_mask))
@@ -510,6 +512,18 @@ class Alignment():
             img_path2=img2_path,
             latent_W_bald=W_src_bald, 
             )
+            # from src.utils.seg_utils import vis_seg_reverse
+            # bgr_image = cv2.imread("/home/diglab/workspace/VividHairStyler/Output/2_final_target_seg.png")
+            # rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+            # target_mask = torch.from_numpy(vis_seg_reverse(rgb_image)).to(device)
+            # target_mask = target_mask.unsqueeze(0).unsqueeze(0).long()
+            # print(target_mask.shape)
+            # warped_latent_2 = load_latent_W("/home/diglab/workspace/VividHairStyler/Output/warped_latent_2.npy").to(device)
+            # im = torchvision.transforms.ToTensor()(img1)[:3].unsqueeze(0).to(self.device)
+            # im = (self.downsample(im).clamp(0, 1) - seg_mean) / seg_std
+            # down_seg, _, _ = self.seg(im)
+            # seg_target1 = torch.argmax(down_seg, dim=1).long()
+            # hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
 
             #####
             with torch.no_grad(): 
@@ -583,7 +597,7 @@ class Alignment():
                 aligned_FS_latent_path = os.path.join(self.opts.save_dir, 'Aligned_FS_latent.npz')
                 np.savez(aligned_FS_latent_path , latent_in=W_src.detach().cpu().numpy(), latent_F=latent_F_mixed.detach().cpu().numpy())
 
-            return gen_im, latent_F_mixed, warped_latent_2, bald_target1, target_mask.squeeze().cpu(), seg_target1
+            return gen_im, latent_F_mixed, warped_latent_2, target_mask.squeeze().cpu(), seg_target1
 
 
     def M2H_test(

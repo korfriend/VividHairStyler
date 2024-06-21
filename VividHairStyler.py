@@ -388,19 +388,11 @@ if run_opt:
 
     src_kp_hm = align.kp_extractor.face_alignment_net(I_1)
 
-    
-    # HM_img = BGR2RGB("/home/diglab/workspace/sketch-project/now_images/20240531-1069_240606_193348_00090/new_target_mask.png")
-    # generated_image = torch.from_numpy(vis_seg_reverse(HM_img)).to(device)
-    # warped_latent_2 = load_latent_W("/home/diglab/workspace/sketch-project/now_images/20240531-1069_240606_193348_00090/warped_latent_2.npy").to(device)
-
-    generated_image = None
-    warped_latent_2 = None
-
     bald_module = Bald(args.bald_model_path)
     W_src_bald = bald_module.make_bald(W_src)
     del bald_module
     
-    I_glign_1_2, F7_blend_1_2, warped_latent_2, bald_seg_target1, target_mask, HM_1_2 =  align.align_images(I_src_rgb, I_sref_rgb, F7_src, W_src, W_sref, W_src_bald, smooth=args.smooth)
+    I_glign_1_2, F7_blend_1_2, warped_latent_2, target_mask, HM_1_2 =  align.align_images(I_src_rgb, I_sref_rgb, F7_src, W_src, W_sref, W_src_bald, smooth=args.smooth)
      
 
     # mask

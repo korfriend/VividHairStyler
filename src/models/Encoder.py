@@ -7,6 +7,7 @@ from argparse import Namespace
 from PIL import Image
 from src.models.psp import pSp
 import torchvision.transforms as transforms
+from ..utils.model_utils import download_weight
 
 class Encoder():
     transform = transforms.Compose([
@@ -21,6 +22,9 @@ class Encoder():
         model_path = "./HairMapper/ckpts/e4e_ffhq_encode.pt", 
         decoder = None
     ) -> None:
+        if not os.path.exists(model_path):
+            download_weight(self.opts.ckpt)
+
         ckpt = torch.load(model_path, map_location='cpu')
         opts = ckpt['opts']
         # pprint.pprint(opts)  # Display full options used
