@@ -16,7 +16,7 @@ Official Implementation of "FS Code Style Transfer". **KEEP UPDATING! Please Git
 `2024/06/07` All source codes have been uploaded
 
 ## Installation
-- System requirement: Ubuntu22.04/Windows 11, Cuda 12.3
+- System requirement: Ubuntu22.04, Cuda 12.3
 - Tested GPUs: RTX4090
 
 - Dependencies:  
