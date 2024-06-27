@@ -336,10 +336,10 @@ class Embedding(nn.Module):
             #     st.image(
             #         self.tensor_to_pil(gen_im)
             #     )
-            if pbar is not None:
-                pbar.progress(int(step / self.opts.FS_steps * 100), text=f'Embedding to FS space ({step} / {self.opts.FS_steps})')
-        if pbar is not None:
-            pbar.empty()
+        #     if pbar is not None:
+        #         pbar.progress(int(step / self.opts.FS_steps * 100), text=f'Embedding to FS space ({step} / {self.opts.FS_steps})')
+        # if pbar is not None:
+        #     pbar.empty()
         return gen_im.detach().clone(), latent_in.detach().clone(), latent_F.detach().clone()
 
     def cal_loss(self, im_dict, latent_in, latent_F=None, F_init=None):

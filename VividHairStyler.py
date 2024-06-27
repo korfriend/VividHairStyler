@@ -127,6 +127,7 @@ def bald_blending(ii2s, W, F7_ori, M, layer_range=(0, 3)):
 def cache_embedding(img, encoder, ii2s):
     embedd_progress = st.progress(20, text="Embedding in progress...")
     _ , W_init = encoder.encode(np.array(img), return_is_tensor=True)
+    # _, W_init = ii2s.invert_image_in_W(img)
     embedd_progress.progress(60, text=f"Embedding in progress... ")
     gen_im, latent_S, latent_F = ii2s.invert_image_in_FS(img, W_init=W_init)
     embedd_progress.progress(100, text=f"Embedding in progress... ")
