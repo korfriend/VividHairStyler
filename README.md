@@ -16,7 +16,7 @@ Official Implementation of "FS Code Style Transfer". **KEEP UPDATING! Please Git
 `2024/06/07` All source codes have been uploaded
 
 ## Installation
-- System requirement: Ubuntu22.04, Cuda 12.3
+- System requirement: Ubuntu22.04, Windows 11, Cuda 12.1
 - Tested GPUs: RTX4090
 
 - Dependencies:  
@@ -25,7 +25,7 @@ All dependencies for defining the environment are provided in `environment.yaml`
 
 - Create conda environment:
 ```
-conda create -n HairTrans python=3.10
+conda create -n HairTrans python=3.9
 conda activate HairTrans
 ```
 
@@ -49,7 +49,7 @@ Please download the [FFHQ](https://drive.google.com/drive/folders/1RxzbNcKb3bPDK
 
 ### Prerequisites
 ```
-$ pip install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+$ pip install pytorch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 pytorch-cuda=12.1 -c pytorch -c nvidia
 $ pip install --upgrade diffusers[torch]
 ```
 

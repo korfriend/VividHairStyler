@@ -8,3 +8,6 @@ scipy==1.7.3
 scikit-image==0.19.3
 ipython==7.31.1
 numba==0.56.4 
+charset-normalizer
+chardet
+ninja
