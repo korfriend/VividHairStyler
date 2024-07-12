@@ -83,4 +83,4 @@ warped_seg: True
 optimize_warped_trg_mask : True
 mean_seg : True
 
-cache_dir: cache
+cache_dir: pretrained_models

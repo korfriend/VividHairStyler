@@ -7,6 +7,7 @@ import os
 from functools import partial
 from tqdm import tqdm
 import PIL
+import random
 import torchvision
 import torchvision.transforms as transforms
 from PIL import Image
@@ -31,10 +32,11 @@ from src.utils.model_utils import download_weight
 toPIL = torchvision.transforms.ToPILImage()
 
 class Alignment():
-    def __init__(self, opts, embedding=None):
+    def __init__(self, opts, embedding=None, seed=8800):
         self.opts = opts
         self.device = opts.device
         self.save_dir = opts.save_dir
+        self.seed = seed  # 시드 저장
         if embedding:
             self.generator = embedding.net.generator
             self.latent_avg = embedding.net.latent_avg
@@ -59,6 +61,16 @@ class Alignment():
         # self.image_transform = transforms.Compose([
         #     transforms.ToTensor(),
         #     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
+
+        self.set_seed(self.seed)
+
+    def set_seed(self, seed):
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
     def get_seg(self, image, target=10):
         im = self.preprocess_img(image)
         down_seg, _, _ = self.seg(im)
@@ -121,6 +133,7 @@ class Alignment():
         return optimizer_align, latent_W
 
     def dilate_erosion_mask_tensor(self, mask, dilate_erosion=5):
+        self.set_seed(self.seed)
         hair_mask = mask.clone()
         hair_mask = hair_mask.numpy()
         hair_mask_dilate = scipy.ndimage.binary_dilation(hair_mask, iterations=dilate_erosion, border_value=0)
@@ -160,6 +173,7 @@ class Alignment():
         return cuda_variables
 
     def dilate_erosion(self, free_mask, device, dilate_erosion=5):
+        self.set_seed(self.seed)
         free_mask = F.interpolate(free_mask.cpu(), size=(256, 256), mode='nearest').squeeze()
         free_mask_D, free_mask_E = self.cuda_unsqueeze(self.dilate_erosion_mask_tensor(free_mask, dilate_erosion=dilate_erosion), device)
         return free_mask_D, free_mask_E
@@ -499,6 +513,7 @@ class Alignment():
                 ):
 
             device = self.device
+            self.set_seed(self.seed)
 
             img1_path = os.path.join(self.opts.save_dir, 'img1.png')
             Image.fromarray(img1).save(img1_path)
@@ -889,6 +904,8 @@ class Alignment():
             warped_down_seg: 최종 결과의 segment입니다. (tensor, (1, 512, 512))
 
         """
+        self.set_seed(self.seed)
+
         im_name_1 =  os.path.splitext(os.path.basename(img_path1))[0]
         is_downsampled = self.opts.size > 256
         device = self.opts.device

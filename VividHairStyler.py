@@ -3,16 +3,21 @@ import sys
 sys.path.insert(0, 'src')
 
 import numpy as np
+from pathlib import Path
 import cv2
 import torch
 import torch.nn.functional as F
 from torchvision.transforms import transforms
+import random
 from PIL import Image
 from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
 import streamlit as st
+import streamlit.components.v1 as components
+
 from streamlit_drawable_canvas import st_canvas
 from tqdm import tqdm
 from src.utils.args_utils import parse_yaml
+from src.utils.parse_face import parse_face
 from src.utils.color_utils import rgb_to_lab
 from src.utils.data_utils import find, get_mask_dict, load_latent_W, load_FS_latent
 from src.utils.sketch_utils import parse_json
@@ -27,7 +32,16 @@ from src.models.Blending import Blending
 from src.losses.blend_loss import BlendLossBuilder
 from src.mapper.Bald import Bald
 
-torch.manual_seed(3866)
+def reset_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+seed = 8800
+reset_seed(seed)
+
 #region Configurations and Constants
 args = parse_yaml('opts/config.yml')
 device = args.device
@@ -197,6 +211,11 @@ def text_to_image(prompt, num_inference_steps=25):
     return result_image
 
 def process_image(img, key):
+    path = os.path.join(args.output_dir, "input1.png")
+    cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    img = parse_face(path, cache_dir=Path(args.cache_dir))[0].convert("RGB")
+    img = np.array(img)
+    # st.markdown(type(img))
     _, latent_S, latent_F = cache_embedding(img, encoder=encoder, ii2s=ii2s)
     latent_dir = os.path.join(output_dir, f'FS_{key}.npz')
     np.savez(latent_dir, latent_in=latent_S.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
@@ -374,9 +393,11 @@ if not run_opt and not sketch_completed:
 #endregion
 
 #region Alignment
-align = Alignment(args, embedding=ii2s)
+align = Alignment(args, embedding=ii2s, seed=seed)
 
 if run_opt:
+
+
     I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_src_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
     I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_aref_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
@@ -629,7 +650,7 @@ if interpolation_latent is not None :
         style_loss = loss_builder.style_loss(H2_region, H1_region, im_dict['mask_hair'], im_dict['mask_2_hair'])
         hair_loss = loss_builder._loss_hair_percept(blend.downsample_256(I_G_color), im_dict['im_3'], im_dict['mask_hair'])
 
-        total_loss += face_loss + hair_loss + 5000 * style_loss
+        total_loss += face_loss + hair_loss + 10000 * style_loss
         opt_blend.zero_grad()
         total_loss.backward(retain_graph=True)
         opt_blend.step()
