@@ -356,6 +356,9 @@ class Alignment():
             img_path2=img2_path,
             latent_W_bald=W_src_bald, 
             )
+
+            hair_mask1 = F.interpolate(hair_mask1.unsqueeze(0).float(), size=(256, 256), mode='area')
+            
             # from src.utils.seg_utils import vis_seg_reverse
             # bgr_image = cv2.imread("/home/diglab/workspace/VividHairStyler/Output/2_final_target_seg.png")
             # rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
@@ -375,7 +378,7 @@ class Alignment():
                 F_align, _ = self.generator([warped_latent_2], input_is_latent=True, return_latents=False,
                                                     start_layer=0, end_layer=3)
                 M_hair = (target_mask == 10) * 1.0
-                # M_hair, _ = self.dilate_erosion(M_hair, device, dilate_erosion=smooth)
+                M_hair, _ = self.dilate_erosion(M_hair, device, dilate_erosion=smooth)
                 M_hair_down_32 = F.interpolate(M_hair.float(), size=(32, 32), mode='area')
 
                 M_union = 1 - (1 - hair_mask1) * (1 - M_hair)
@@ -385,12 +388,9 @@ class Alignment():
                 M_union, _ = self.dilate_erosion(M_union, device, dilate_erosion=smooth)
                 M_union_down_32 = F.interpolate(M_union.float(), size=(32, 32), mode='area')[0]
                 M_keep = 1 - M_union_down_32
-                
-                M_back = torch.where((target_mask == 0) & (M_hole>0.5), torch.ones_like(target_mask), torch.zeros_like(target_mask))
-                M_back_down_32 = F.interpolate(M_back.float(), size=(32, 32), mode='area')
-
+            # Optimizing
             optimizer_align, latent_align = self.setup_align_optimizer(latent_in=W_src_bald)
-
+            loss_list = []
             pbar = tqdm(range(121), desc='Align img1 to seg_mask', leave=False)            
             for step in pbar:
                 optimizer_align.zero_grad()
@@ -427,43 +427,63 @@ class Alignment():
                 loss.backward()
                 optimizer_align.step()
 
-            seg_target1 = torch.argmax(down_seg, dim=1).long()
-            seg_target1 = seg_target1[0].byte().cpu().detach()
-                
-            save_im = toPIL(((gen_im + 1) / 2).clamp(0, 1).squeeze().cpu())
-            save_im.save(os.path.join(self.opts.save_dir, 'Aligned_src_img.png'))
+                if step % 20 == 0 :
+                    test_F_mixed = latent_F_mixed.clone()+ M_keep.unsqueeze(0) * (F_src - latent_F_mixed.clone())
+                    test_F_mixed = test_F_mixed + M_hair_down_32 * (F_align - test_F_mixed)
+
+                    test_im, _ = self.generator([latent_in], input_is_latent=True, return_latents=False, start_layer=4,
+                                    end_layer=8, layer_in=test_F_mixed)
+                    save_img = toPIL(((test_im + 1) / 2).clamp(0, 1).squeeze().cpu())
+                    save_img.save(os.path.join(self.save_dir, f"aligned_image_w_bald_{step}.png"))     
+                    loss_list.append(loss.item())  # Store the loss value for W+ space
+                    
+                    seg_target1 = torch.argmax(down_seg, dim=1).long()
+                    seg_target1 = seg_target1[0].byte().cpu().detach()
+                    self.save_vis_mask('img_path1', 'img_path2', seg_target1.cpu(), self.save_dir, count=f'6th_down_seg_w_bald_{step}')
+            
 
             ##############################################    
 
             with torch.no_grad():
-                # mask
-                M_union = 1 - (1 - hair_mask1.unsqueeze(0)) * (1 - M_hair.unsqueeze(0))
-                M_union, _ = self.dilate_erosion(M_union.squeeze(0), device, dilate_erosion=smooth)
-                M_union_down_32 = F.interpolate(M_union.float(), size=(32, 32), mode='area')[0]
-                M_keep = 1 - M_union_down_32
+                # save mask
+                seg_target1 = seg_target1.to(device)
+                M_back = torch.where((seg_target1 == 0) & (M_hole>0.5), torch.ones_like(seg_target1), torch.zeros_like(seg_target1))
+                if M_back.dim() == 2: 
+                    M_back_down_32 = F.interpolate(M_back.float().unsqueeze(0).unsqueeze(0), size=(32, 32), mode='area')
+                elif  M_back.dim() == 3:  
+                    M_back_down_32 = F.interpolate(M_back.float().unsqueeze(0), size=(32, 32), mode='area')
+                save_mask = toPIL(((M_back + 1) / 2).clamp(0, 1).squeeze().cpu())
+                save_mask.save(os.path.join(self.save_dir, "M_back.png"))
 
-                # F 
-                aligned_latent, _ = self.generator([latent_align], input_is_latent=True, return_latents=False,
-                                                        start_layer=0, end_layer=3)
-                F_new = aligned_latent.clone().detach()
-                latent_F_mixed = F_new + M_hair_down_32 * (F_align - F_new)
-                latent_F_mixed = latent_F_mixed + M_keep.unsqueeze(0) * (F_src - latent_F_mixed)
+                # save image 
+                # 1) Aligned_src_img : src img -> target
+                save_im = toPIL(((gen_im + 1) / 2).clamp(0, 1).squeeze().cpu())
+                save_im.save(os.path.join(self.opts.save_dir, 'Aligned_src_img.png'))
+                
+                # 2) Aligned_src_sref_img : (sref img -> target) + (src img -> target)
+                latent_F_mixed = F_back + M_keep.unsqueeze(0) * (F_src - F_back)
+                latent_F_mixed = latent_F_mixed + M_hair_down_32 * (F_align - latent_F_mixed)
 
-                # image
-                gen_im, _ = self.generator([W_src], input_is_latent=True, return_latents=False, start_layer=4,
+                aligned_gen_im, _ = self.generator([latent_in], input_is_latent=True, return_latents=False, start_layer=4,
                                         end_layer=8, layer_in=latent_F_mixed)
-                save_im = toPIL(((gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
+                save_im = toPIL(((aligned_gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
                 save_im.save(os.path.join(self.opts.save_dir, 'Aligned_src_sref_img.png'))
 
-                warped_gen_im, _ = self.generator([warped_latent_2], input_is_latent=True, return_latents=False,
-                                        start_layer=0, end_layer=8)
-                warped_gen_im = toPIL(((warped_gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
-                warped_gen_im.save(os.path.join(self.opts.save_dir, 'Aligned_sref_img.png'))
+                # 3) Aligned_src_bald_img : F code with background region
+                F_bald, _ = self.generator([W_src_bald], input_is_latent=True, return_latents=False,
+                                start_layer=0, end_layer=3)
+                latent_F_mixed_bald = latent_F_mixed + M_back_down_32 * (F_bald - latent_F_mixed)
 
+                bald_gen_im, _ = self.generator([latent_in], input_is_latent=True, return_latents=False, start_layer=4,
+                                        end_layer=8, layer_in=latent_F_mixed_bald)
+                save_im = toPIL(((bald_gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
+                save_im.save(os.path.join(self.opts.save_dir, 'Aligned_src_bald_img.png'))
+
+                # save latent vector
                 aligned_FS_latent_path = os.path.join(self.opts.save_dir, 'Aligned_FS_latent.npz')
                 np.savez(aligned_FS_latent_path , latent_in=W_src.detach().cpu().numpy(), latent_F=latent_F_mixed.detach().cpu().numpy())
 
-            return gen_im, latent_F_mixed, warped_latent_2, target_mask.squeeze().cpu(), seg_target1
+            return aligned_gen_im, latent_F_mixed, warped_latent_2, target_mask.squeeze().cpu(), seg_target1
 
 
     def M2H_test(
@@ -1010,7 +1030,7 @@ class Alignment():
                         [204, 102, 255],  ## 10
                         [0, 153, 255],  ## 11
                         [0, 255, 153],  ## 12
-                        [0, 51, 0],
+                        [150, 75, 0],
                         [102, 153, 255],  ## 14
                         [255, 153, 102],  ## 15
                         ])
