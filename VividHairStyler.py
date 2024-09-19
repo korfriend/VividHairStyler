@@ -12,7 +12,6 @@ import random
 from PIL import Image
 from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
 import streamlit as st
-import streamlit.components.v1 as components
 
 from streamlit_drawable_canvas import st_canvas
 from tqdm import tqdm
@@ -140,10 +139,11 @@ def bald_blending(ii2s, W, F7_ori, M, layer_range=(0, 3)):
 # @st.cache_data
 def cache_embedding(img, encoder, ii2s):
     embedd_progress = st.progress(20, text="Embedding in progress...")
-    _ , W_init = encoder.encode(np.array(img), return_is_tensor=True)
+    # _ , W_init = encoder.encode(np.array(img), return_is_tensor=True)
     # _, W_init = ii2s.invert_image_in_W(img)
-    embedd_progress.progress(60, text=f"Embedding in progress... ")
-    gen_im, latent_S, latent_F = ii2s.invert_image_in_FS(img, W_init=W_init)
+    # embedd_progress.progress(60, text=f"Embedding in progress... ")
+    pil_image = Image.fromarray(img)
+    gen_im, latent_S, latent_F = ii2s.invert_image_in_FS(img)
     embedd_progress.progress(100, text=f"Embedding in progress... ")
     embedd_progress.empty()
     return gen_im, latent_S, latent_F
@@ -211,11 +211,6 @@ def text_to_image(prompt, num_inference_steps=25):
     return result_image
 
 def process_image(img, key):
-    path = os.path.join(args.output_dir, "input1.png")
-    cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-    img = parse_face(path, cache_dir=Path(args.cache_dir))[0].convert("RGB")
-    img = np.array(img)
-    # st.markdown(type(img))
     _, latent_S, latent_F = cache_embedding(img, encoder=encoder, ii2s=ii2s)
     latent_dir = os.path.join(output_dir, f'FS_{key}.npz')
     np.savez(latent_dir, latent_in=latent_S.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
@@ -315,6 +310,11 @@ M_aref = get_mask_dict(im=images[2], mask=None, embedding=ii2s)
 W_src, F7_src = latents[0].clone(), Fs[0].clone()
 W_sref, F7_sref = latents[1].clone(), Fs[1].clone()
 W_aref, F7_aref = latents[2].clone(), Fs[2].clone()
+bald_module = Bald(args.bald_model_path)
+W_src_bald = bald_module.make_bald(W_src)
+del bald_module
+F7_bald, G_baldFS = bald_blending(ii2s, W_src_bald, F7_src, M_src['tensor'][32]*255, layer_range=(0, 3))
+Image.fromarray(ii2s.tensor_to_numpy(G_baldFS)).save(os.path.join(output_dir, "Src_bald_image.png"))
 
 ########### Configuring the Hair Editing interface ###########
 st.title("Hair Editing")
@@ -393,7 +393,7 @@ if not run_opt and not sketch_completed:
 #endregion
 
 #region Alignment
-align = Alignment(args, embedding=ii2s, seed=seed)
+align = Alignment(args, embedding=ii2s)
 
 if run_opt:
 
@@ -402,13 +402,7 @@ if run_opt:
     I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_aref_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
     src_kp_hm = align.kp_extractor.face_alignment_net(I_1)
-
-    bald_module = Bald(args.bald_model_path)
-    W_src_bald = bald_module.make_bald(W_src)
-    del bald_module
-    
     I_glign_1_2, F7_blend_1_2, warped_latent_2, target_mask, HM_1_2 =  align.align_images(I_src_rgb, I_sref_rgb, F7_src, W_src, W_sref, W_src_bald, smooth=args.smooth)
-     
 
     # mask
     HM_1D, _ = align.dilate_erosion(M_src['tensor'][1024], device)
@@ -434,7 +428,7 @@ if run_opt:
 
     F_mixed = F7_blend_1_2
     F_hair = F7_aref
-    interpolation_latent = ((W_src + W_aref) / 2).detach().clone().requires_grad_(True)
+    interpolation_latent = ((W_aref+W_src)/2).detach().clone().requires_grad_(True)
 
     im_dict = {
         'im_1': I_1,
@@ -443,7 +437,6 @@ if run_opt:
         'mask_hair': HM_3E,
         'mask_2_hair': downsampled_hair_mask,
     }
-
 
 elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
     if edit_mode == "Hair Mask Editing" :
@@ -456,17 +449,11 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         user_mask = user_mask > 0
         Image.fromarray(user_mask).save(os.path.join(output_dir,"user_mask.png"))
 
-
-        bald_module = Bald(args.bald_model_path)
-        W_src_bald = bald_module.make_bald(W_src)
-
-        del bald_module
-        F7_bald, G_baldFS = bald_blending(ii2s, W_src_bald, F7_src, M_src['tensor'][32]*255, layer_range=(0, 3))
-
         bald_seg_mask = ii2s.get_seg(G_baldFS, target=None)
         bald_target1 = torch.argmax(bald_seg_mask, dim=1).long()
         bald_target1 = bald_target1[0].byte()
         new_bald_seg = torch.where(torch.from_numpy(user_mask).to(device)==1, 10 * torch.ones_like(bald_target1), bald_target1)
+        align.save_vis_mask('img_path1', 'img_path2', bald_target1.cpu().squeeze(), output_dir, count='0_bald_seg')
 
         I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(st.session_state.canvas_background).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
             
@@ -477,9 +464,7 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
             F_mixed = F7_blend_line
             
             result_S, result_F = load_FS_latent(Result_FS_path)
-
             result_img = st.session_state.I_G_blend
-            # I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(result_img).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
             result_seg_mask = ii2s.get_seg(Result_Image_path, target=None)
             result_target1 = torch.argmax(result_seg_mask, dim=1).long()
@@ -489,7 +474,6 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
 
             F_hair = result_F.clone()
             interpolation_latent = result_S.detach().clone().requires_grad_(True)
-            interpolation_latent = ((W_src + result_S) / 2).detach().clone().requires_grad_(True)
 
 
         else : 
@@ -521,7 +505,7 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         # st.image(ii2s.tensor_to_numpy(HM_newE))
         
         im_dict = {
-            'im_1': I_1,
+            'im_1': I_3,
             'im_3': I_3,
             'mask_face': target_mask,
             'mask_hair': HM_1D,
@@ -604,7 +588,7 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         F_hair = F_mixed.clone()
         
         HM_1D, _ = align.dilate_erosion(torch.from_numpy(st.session_state.canvas_background2_mask).unsqueeze(0).unsqueeze(0), device)
-        hair_mask = HM_1D + new_hair_mask
+        hair_mask = new_hair_mask
         HM_newD, HM_newE = align.dilate_erosion(hair_mask.float(), device)
         downsampled_hair_mask = F.interpolate(HM_newE, size=(256, 256), mode='area')
         # st.image(ii2s.tensor_to_numpy(new_hair_mask))
