@@ -180,8 +180,8 @@ class Alignment():
 
         np.save(W_latent_path, latent_in.detach().cpu().numpy())
         np.savez(FS_latent_path , latent_in=latent_in.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
- 
-    def create_target_segmentation_mask_with_bald_new(
+
+    def create_target_segmentation_mask_with_bald(
             self, 
             img_path1,
             img_path2,
@@ -351,7 +351,7 @@ class Alignment():
             W_latent_path = os.path.join(self.opts.save_dir, 'img2')
             np.save(W_latent_path, W_sref.detach().cpu().numpy())
 
-            target_mask, seg_target2, hair_mask1, M_hole, bald_target1, warped_latent_2 = self.create_target_segmentation_mask_with_bald_new(
+            target_mask, seg_target2, hair_mask1, M_hole, bald_target1, warped_latent_2 = self.create_target_segmentation_mask_with_bald(
             img_path1=img1_path, 
             img_path2=img2_path,
             latent_W_bald=W_src_bald, 

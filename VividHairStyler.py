@@ -491,18 +491,7 @@ elif sketch_completed and len(canvas_result.json_data['objects']) != 0:
         with torch.no_grad():
             HM_newD, HM_newE = align.dilate_erosion(new_hair_mask, device)
             downsampled_hair_mask = F.interpolate(HM_newE, size=(256, 256), mode='bilinear', align_corners=False)  
-            I_X, _ = ii2s.generator([interpolation_latent], input_is_latent=True, return_latents=False, start_layer=4, end_layer=8, layer_in=F7_blend_line)
-            I_X_0_1 = (I_X + 1) / 2
-            IM = (align.downsample(I_X_0_1) - seg_mean) / seg_std
-            down_seg, _, _ = ii2s.seg(IM)
-            current_mask = torch.argmax(down_seg, dim=1).long().cpu().float()
-            HM_X = torch.where(current_mask == 10, torch.ones_like(current_mask), torch.zeros_like(current_mask))
-            HM_X = F.interpolate(HM_X.unsqueeze(0), size=(256, 256), mode='nearest').squeeze()
-            HM_XD, _ = align.cuda_unsqueeze(align.dilate_erosion_mask_tensor(HM_X), device)
-            target_mask = (1 - HM_1D) * (1 - HM_newD) * (1 - HM_XD)
-        # st.image(ii2s.tensor_to_numpy(target_mask))
-        # st.image(ii2s.tensor_to_numpy(HM_1D))
-        # st.image(ii2s.tensor_to_numpy(HM_newE))
+            target_mask = (1 - HM_1D) * (1 - HM_newD) 
         
         im_dict = {
             'im_1': I_3,
