@@ -36,7 +36,6 @@ class Alignment():
         self.opts = opts
         self.device = opts.device
         self.save_dir = opts.save_dir
-        self.seed = seed  # 시드 저장
         if embedding:
             self.generator = embedding.net.generator
             self.latent_avg = embedding.net.latent_avg
@@ -61,16 +60,6 @@ class Alignment():
         # self.image_transform = transforms.Compose([
         #     transforms.ToTensor(),
         #     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
-
-        self.set_seed(self.seed)
-
-    def set_seed(self, seed):
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        random.seed(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
     def get_seg(self, image, target=10):
         im = self.preprocess_img(image)
         down_seg, _, _ = self.seg(im)
@@ -133,7 +122,6 @@ class Alignment():
         return optimizer_align, latent_W
 
     def dilate_erosion_mask_tensor(self, mask, dilate_erosion=5):
-        self.set_seed(self.seed)
         hair_mask = mask.clone()
         hair_mask = hair_mask.numpy()
         hair_mask_dilate = scipy.ndimage.binary_dilation(hair_mask, iterations=dilate_erosion, border_value=0)
@@ -173,7 +161,6 @@ class Alignment():
         return cuda_variables
 
     def dilate_erosion(self, free_mask, device, dilate_erosion=5):
-        self.set_seed(self.seed)
         free_mask = F.interpolate(free_mask.cpu(), size=(256, 256), mode='nearest').squeeze()
         free_mask_D, free_mask_E = self.cuda_unsqueeze(self.dilate_erosion_mask_tensor(free_mask, dilate_erosion=dilate_erosion), device)
         return free_mask_D, free_mask_E
@@ -193,7 +180,7 @@ class Alignment():
 
         np.save(W_latent_path, latent_in.detach().cpu().numpy())
         np.savez(FS_latent_path , latent_in=latent_in.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
-    
+ 
     def create_target_segmentation_mask_with_bald_new(
             self, 
             img_path1,
@@ -356,7 +343,6 @@ class Alignment():
                 ):
 
             device = self.device
-            self.set_seed(self.seed)
 
             img1_path = os.path.join(self.opts.save_dir, 'img1.png')
             Image.fromarray(img1).save(img1_path)
@@ -365,7 +351,7 @@ class Alignment():
             W_latent_path = os.path.join(self.opts.save_dir, 'img2')
             np.save(W_latent_path, W_sref.detach().cpu().numpy())
 
-            target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, warped_latent_2 = self.create_target_segmentation_mask_with_bald_new(
+            target_mask, seg_target2, hair_mask1, M_hole, bald_target1, warped_latent_2 = self.create_target_segmentation_mask_with_bald_new(
             img_path1=img1_path, 
             img_path2=img2_path,
             latent_W_bald=W_src_bald, 
@@ -385,25 +371,47 @@ class Alignment():
 
             #####
             with torch.no_grad(): 
+                # F 
+                F_align, _ = self.generator([warped_latent_2], input_is_latent=True, return_latents=False,
+                                                    start_layer=0, end_layer=3)
                 M_hair = (target_mask == 10) * 1.0
                 # M_hair, _ = self.dilate_erosion(M_hair, device, dilate_erosion=smooth)
                 M_hair_down_32 = F.interpolate(M_hair.float(), size=(32, 32), mode='area')
 
-                F_align, _ = self.generator([warped_latent_2], input_is_latent=True, return_latents=False,
-                                                    start_layer=0, end_layer=3)
+                M_union = 1 - (1 - hair_mask1) * (1 - M_hair)
+                test_M_keep = 1-M_union
+                self.save_vis_mask(img1_path, img2_path, test_M_keep.squeeze().cpu(),self.save_dir, count='M_keep')
 
-            optimizer_align, latent_align = self.setup_align_optimizer(latent_in=W_sref)
+                M_union, _ = self.dilate_erosion(M_union, device, dilate_erosion=smooth)
+                M_union_down_32 = F.interpolate(M_union.float(), size=(32, 32), mode='area')[0]
+                M_keep = 1 - M_union_down_32
+                
+                M_back = torch.where((target_mask == 0) & (M_hole>0.5), torch.ones_like(target_mask), torch.zeros_like(target_mask))
+                M_back_down_32 = F.interpolate(M_back.float(), size=(32, 32), mode='area')
 
-            pbar = tqdm(range(self.opts.align_steps1), desc='Align img1 to seg_mask', leave=False)
+            optimizer_align, latent_align = self.setup_align_optimizer(latent_in=W_src_bald)
+
+            pbar = tqdm(range(121), desc='Align img1 to seg_mask', leave=False)            
             for step in pbar:
                 optimizer_align.zero_grad()
 
-                F_fill, _ = self.generator([latent_align], input_is_latent=True, return_latents=False,
-                                    start_layer=0, end_layer=3)
+                latent_in = torch.cat([latent_align[:, :6, :], W_src[:, 6:, :]], dim=1)
+                down_seg, gen_im = self.create_down_seg(latent_in)
+                F_back, _ = self.generator([latent_in], input_is_latent=True, return_latents=False,
+                                start_layer=0, end_layer=3)
                 
-                latent_F_mixed = F_fill + M_hair_down_32 * (F_align - F_fill)
+                # 1) all region
+                # latent_F_mixed = F_back
 
-                gen_im, _ = self.generator([W_src], input_is_latent=True, return_latents=False, start_layer=4,
+                # 2) except hair region
+                latent_F_mixed = F_back + M_hair_down_32 * (F_align - F_back)
+
+                # 3) hole region
+                # latent_F_mixed = F_back + M_keep.unsqueeze(0) * (F_src - F_back)
+                # latent_F_mixed = latent_F_mixed + M_hair_down_32 * (F_align - latent_F_mixed)
+                
+
+                gen_im, _ = self.generator([latent_in], input_is_latent=True, return_latents=False, start_layer=4,
                                     end_layer=8, layer_in=latent_F_mixed)
 
                 G_0_1 = (gen_im + 1) / 2
@@ -747,8 +755,6 @@ class Alignment():
             warped_down_seg: 최종 결과의 segment입니다. (tensor, (1, 512, 512))
 
         """
-        self.set_seed(self.seed)
-
         im_name_1 =  os.path.splitext(os.path.basename(img_path1))[0]
         is_downsampled = self.opts.size > 256
         device = self.opts.device

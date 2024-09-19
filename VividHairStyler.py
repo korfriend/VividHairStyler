@@ -631,7 +631,7 @@ if interpolation_latent is not None :
     loss_builder = BlendLossBuilder(args)
     opt_blend = torch.optim.Adam([interpolation_latent], lr=ii2s.opts.learning_rate)
 
-    pbar = tqdm(range(150), desc='Blend', leave=False)
+    pbar = tqdm(range(100), desc='Blend', leave=False)
     blend_progress = st.progress(0, text="Blending in progress...")
     for step in pbar:
         opt_blend.zero_grad()
