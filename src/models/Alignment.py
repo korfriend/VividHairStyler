@@ -193,197 +193,6 @@ class Alignment():
 
         np.save(W_latent_path, latent_in.detach().cpu().numpy())
         np.savez(FS_latent_path , latent_in=latent_in.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
-
-    def create_target_segmentation_mask_with_bald(
-            self, 
-            img_path1, 
-            img_path2,
-            latent_W_bald, 
-            is_downsampled=True, 
-            user_sketch = False,
-            user_mask = None,
-            pbar=None
-            ) :
-        im1 = self.preprocess_img(img_path1)
-        down_seg, _, _ = self.seg(im1)
-        seg_target1 = torch.argmax(down_seg, dim=1).long()
-
-        im2 = self.preprocess_img(img_path2)
-        down_seg2, _, _ = self.seg(im2)
-        seg_target2 = torch.argmax(down_seg2, dim=1).long()
-        seg_target2_temp = seg_target2.clone()
-
-        G_bald, _ = self.generator([latent_W_bald], input_is_latent=True, return_latents=False,
-                                        start_layer=0, end_layer=8)
-        G_bald_0_1 = (G_bald + 1) / 2
-        im = (self.downsample(G_bald_0_1) - seg_mean) / seg_std
-        bald_seg, _, _ = self.seg(im)
-        bald_target1 = torch.argmax(bald_seg, dim=1).long()
-        bald_target1 = bald_target1[0].byte()
-        self.save_vis_mask(img_path1, img_path2, bald_target1.cpu().squeeze(), self.save_dir, count='bald_seg')
-
-        hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
-        seg_target1 = seg_target1[0].byte()
-        seg_target1 = torch.where(seg_target1 == 12, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap      
-        seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap
-        if self.opts.optimize_warped_trg_mask:
-            im1_for_kp = F.interpolate(im1, size=(256, 256))
-            im1_for_kp = ((im1_for_kp + 1) / 2).clamp(0, 1)  # [0, 1] 사이로
-            src_kp_hm = self.kp_extractor.face_alignment_net(im1_for_kp)
-            im2, warped_latent_2, _ = self.warp_target(img_path2, src_kp_hm, img_path1, None)  # Warping !!
-            save_im = toPIL(((im2 + 1) / 2).clamp(0, 1).squeeze().cpu())
-            save_im.save(os.path.join(self.opts.save_dir, '5_Aligned_src_img.png'))
-            warped_down_seg, im2 = self.create_down_seg(warped_latent_2, is_downsampled=is_downsampled)
-            if is_downsampled == False:
-                warped_seg = F.interpolate(warped_down_seg, size=(self.opts.size, self.opts.size))
-                seg_target2 = torch.argmax(warped_seg, dim=1).long()  # todo : debug for k,  512 or 256
-            else:
-                seg_target2 = torch.argmax(warped_down_seg, dim=1).long()
-            warped_down_seg = torch.argmax(warped_down_seg.clone().detach(), dim=1).long()  # 512, 512
-
-        hair_mask2 = torch.where(seg_target2 == 10, torch.ones_like(seg_target2), torch.zeros_like(seg_target2))
-        seg_target2 = seg_target2[0].byte()
-        
-        ##########
-        from src.utils.seg_utils import vis_seg
-        Image.fromarray(self.tensor_to_numpy(im2)).save("./_temp2/gen_im.png")
-        np.save("./_temp2/latent.npy", warped_latent_2.detach().cpu().numpy())
-        Image.fromarray(
-            vis_seg(seg_target2.detach().cpu().squeeze().numpy())
-        ).save("_temp2/seg.png")
-        if user_sketch:
-            sketch_result = Image.open("./_temp2/r_result.png")
-            sketch_latent = torch.from_numpy(np.load("./_temp2/r_latent.npy")).to(self.device)
-            sketch_down_seg, gen_im = self.create_down_seg(sketch_latent)
-            sketch_down_seg = torch.argmax(sketch_down_seg, dim=1)
-            sketch_mask = (sketch_down_seg == 10).unsqueeze(0).float()
-            sketch_mask = F.interpolate(sketch_mask, (32, 32))
-            warped_latent_2 = sketch_latent.detach().clone()
-
-            seg_target2 = sketch_down_seg.detach().clone().squeeze().byte()
-            # seg_target2 = sketch_down_seg.detach.clone()
-        if user_mask is not None:
-
-            seg_target2, _ = self.create_down_seg(warped_latent_2)
-            seg_target2 = torch.argmax(seg_target2, dim=1)
-
-            # 마스크 전처리. np -> tensor
-            if isinstance(user_mask, np.ndarray):
-                user_mask = torch.from_numpy(user_mask).to(self.device).unsqueeze(0)
-            target_mask = torch.where(user_mask, 10, seg_target2)
-
-
-            im = target_mask.detach().squeeze().cpu().numpy()
-            optimizer_align, latent_align = self.setup_align_optimizer(warped_latent_2, ex_mode=True)
-            latent_end = latent_align[:, 6:, :].clone().detach()
-            for step in range(61):
-                optimizer_align.zero_grad()
-                latent_in = torch.cat([latent_align[:, :6, :], latent_end], dim=1)
-                down_seg, gen_im = self.create_down_seg(latent_in)
-
-                loss_dict = {}
-
-                # ce_loss = self.loss_builder.cross_entropy_loss(down_seg, target_mask)
-                ce_loss = self.loss_builder.weight_cross_entropy_loss(down_seg, target_mask)
-
-
-                loss_dict["ce_loss"] = ce_loss.item()
-                loss = ce_loss
-
-
-                loss.backward()
-                optimizer_align.step()
-                # if step % 10 == 0:
-                #     st.image(
-                #         cv2.resize(self.tensor_to_numpy(gen_im), (256, 256)), 
-                #         caption=f"step: {step}"
-                #     )
-            latent_in = torch.cat([latent_align[:, :6, :], latent_end], dim=1)
-            down_seg, gen_im = self.create_down_seg(latent_in)
-            seg_target2 = torch.argmax(down_seg, dim=1).long()
-            warped_down_seg = torch.argmax(down_seg.clone().detach(), dim=1).long()  # 512, 512
-            warped_latent_2 = latent_in.detach().clone()
-        
-        ##########
-        new_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(seg_target1), seg_target1) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
-
-        self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='0_erased_src_seg')
-        self.save_vis_mask(img_path1, img_path2, new_target.cpu(), self.save_dir, count='0_initial_target_seg')
-
-        if self.opts.mean_seg:
-            if self.opts.warped_seg:  # mean_seg is the warped target img's seg
-                mean_seg = warped_down_seg.squeeze().type(torch.ByteTensor)  # 512, 512 or 256, 256
-                self.save_vis_mask(img_path1, img_path2, mean_seg.cpu(),self.save_dir,count='1_warped_target_seg')
-            
-            bald_target1 = torch.where(bald_target1 == 10, torch.zeros_like(bald_target1), bald_target1)  # hair 부분 제외한 나머지 segmap
-        
-            M_hole = (1 - (1-hair_mask1) - hair_mask2).clamp(min=0)
-            save_img = toPIL(((M_hole + 1) / 2).clamp(0, 1).squeeze().cpu())
-            save_img.save(os.path.join(self.save_dir, "M_hole.png"))
-            
-            
-            bald_target1_face = torch.where((bald_target1 >= 1) & (bald_target1 <= 6), bald_target1, torch.zeros_like(bald_target1)) * 1.0
-            masked_bald_down_seg = bald_target1_face* M_hole
-            new_target = torch.where((new_target == 0) & M_hole.bool(), masked_bald_down_seg, new_target)
-            self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='1st_target_seg')
-
-            if torch.any(seg_target2 == 14) :
-                new_target = torch.where((new_target == 0) & (seg_target2 == 14) & M_hole.bool(), seg_target2, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='2nd_target_seg')
-
-            if torch.any(bald_target1 == 14) :
-                new_target = torch.where((new_target == 0) & (bald_target1 == 14) & M_hole.bool(), bald_target1, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='3rd_target_seg')
-            
-            if torch.any(seg_target2 == 15) :
-                new_target = torch.where((new_target == 0) & (seg_target2 == 15) & M_hole.bool(), seg_target2, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='4th_target_seg')
-
-            if torch.any(bald_target1 == 15) :
-                new_target = torch.where((new_target == 0) & (bald_target1 == 15) & M_hole.bool(), bald_target1, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='5th_target_seg')
-            
-            inpaint_seg = torch.where(M_hole.bool(), new_target, torch.zeros_like(new_target))
-            self.save_vis_mask(img_path1, img_path2, inpaint_seg.cpu().squeeze(), self.save_dir, count='inpaint_target_seg')
-            
-            new_target_mean_seg = torch.where((new_target == 0) * (seg_target2.to(self.opts.device) != 0), seg_target2.to(self.opts.device), new_target)  # 220213 edited by taeu
-            # self.save_vis_mask(img_path1, img_path2, new_target_mean_seg.cpu(), self.save_dir,count='1_warped_target+source_seg')
-            
-            # if latent_sketch is not None : 
-            #     G_sketch, _ = self.generator([latent_sketch], input_is_latent=True, return_latents=False,
-            #                             start_layer=0, end_layer=8)
-            #     G_sketch_0_1 = (G_sketch + 1) / 2
-            #     im = (self.downsample(G_sketch_0_1) - seg_mean) / seg_std
-            #     sketch_seg, _, _ = self.seg(im)
-            #     sketch_target1 = torch.argmax(sketch_seg, dim=1).long()
-            #     sketch_target1 = sketch_target1[0].byte()
-            #     sketch_hair_mask = torch.where(sketch_target1==10, torch.ones_like(sketch_target1),torch.zeros_like(sketch_target1))
-            #     new_hair_mask = binary_sketch_mask * sketch_hair_mask
-
-
-            target_mask = new_target_mean_seg.unsqueeze(0).long().to(self.opts.device)
-        else:
-            target_mask = new_target.unsqueeze(0).long().to(self.opts.device)
-
-        self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(),self.save_dir, count='2_final_target_seg')
-
-        #####################  Save Visualization of Target Segmentation Mask
-        hair_mask_target = torch.where(target_mask == 10, torch.ones_like(target_mask), torch.zeros_like(target_mask))
-        if is_downsampled:
-            hair_mask_target = F.interpolate(hair_mask_target.float(), size=(512, 512), mode='nearest')
-        else:
-            hair_mask_target = F.interpolate(hair_mask_target.float().unsqueeze(0), size=(self.opts.size, self.opts.size), mode='nearest')
-
-        # if generated_mask is not None:
-        #     generated_mask_tensor = generated_mask.unsqueeze(0).unsqueeze(0).float().to(self.opts.device)
-        #     generated_mask_resized = F.interpolate(generated_mask_tensor, size=target_mask.shape[-2:], mode='nearest').squeeze(0)
-        #     target_mask = torch.where(generated_mask_resized == 1, 10 * torch.ones_like(target_mask), target_mask)
-
-        if self.opts.optimize_warped_trg_mask:
-            hair_mask2 = torch.where(seg_target2_temp == 10, torch.ones_like(seg_target2_temp), torch.zeros_like(seg_target2_temp))
-            return target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, warped_latent_2
-        else:
-            return target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, None
     
     def create_target_segmentation_mask_with_bald_new(
             self, 
@@ -392,7 +201,6 @@ class Alignment():
             latent_W_bald, 
             is_downsampled=True,
             ) :
-        
         im1 = self.preprocess_img(img_path1)
         down_seg, _, _ = self.seg(im1)
         seg_target1 = torch.argmax(down_seg, dim=1).long()
@@ -409,11 +217,13 @@ class Alignment():
         bald_seg, _, _ = self.seg(im)
         bald_target1 = torch.argmax(bald_seg, dim=1).long()
         bald_target1 = bald_target1[0].byte()
-        self.save_vis_mask(img_path1, img_path2, bald_target1.cpu().squeeze(), self.save_dir, count='bald_seg')
+        bald_target1 = torch.where(bald_target1 == 10, torch.zeros_like(bald_target1), bald_target1)  # hair 부분 제외한 나머지 segmap
+        self.save_vis_mask(img_path1, img_path2, bald_target1.cpu().squeeze(), self.save_dir, count='0_bald_seg')
 
         hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
         seg_target1 = seg_target1[0].byte()
-        seg_target1 = torch.where(seg_target1 == 12, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap      
+        test_seg_target1 = seg_target1.clone()
+        seg_target1 = torch.where(seg_target1 == 12, torch.zeros_like(seg_target1), seg_target1)  # earing 부분 제외한 나머지 segmap      
         seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap
         
         if self.opts.optimize_warped_trg_mask:
@@ -422,7 +232,7 @@ class Alignment():
             src_kp_hm = self.kp_extractor.face_alignment_net(im1_for_kp)
             im2, warped_latent_2, _ = self.warp_target(img_path2, src_kp_hm, img_path1, True)  # Warping !!
             save_im = toPIL(((im2 + 1) / 2).clamp(0, 1).squeeze().cpu())
-            save_im.save(os.path.join(self.opts.save_dir, '5_Aligned_src_img.png'))
+            save_im.save(os.path.join(self.opts.save_dir, 'Aligned_sref_img.png'))
             warped_down_seg, im2 = self.create_down_seg(warped_latent_2, is_downsampled=is_downsampled)
             if is_downsampled == False:
                 warped_seg = F.interpolate(warped_down_seg, size=(self.opts.size, self.opts.size))
@@ -435,8 +245,25 @@ class Alignment():
         seg_target2 = seg_target2[0].byte()
         
         ##########
-
         new_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(seg_target1), seg_target1) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
+        new_target = torch.where(seg_target2 == 6, 6 * torch.ones_like(new_target), new_target)
+
+        
+        test_target = torch.where(test_seg_target1 == 0, 13*torch.ones_like(test_seg_target1), test_seg_target1)
+        test_target = torch.where(test_seg_target1 == 12, torch.zeros_like(test_seg_target1), test_target)  # earing 부분 제외한 나머지 segmap      
+        test_target = torch.where(test_seg_target1 == 10, torch.zeros_like(test_seg_target1), test_target)  # hair 부분 제외한 나머지 segmap
+        
+        self.save_vis_mask(img_path1, img_path2, test_target.cpu(), self.save_dir, count='test_erased_src_seg')
+
+        new_hair_target =  torch.where(seg_target2 == 10, 10 * torch.ones_like(seg_target2), torch.zeros_like(seg_target2)) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
+        self.save_vis_mask(img_path1, img_path2, new_hair_target.cpu(), self.save_dir, count='test_new_hair_target')
+        new_hair_target =  torch.where(seg_target2 == 0, 13 * torch.ones_like(seg_target2), seg_target2) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
+        
+
+        test_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(test_target), test_target) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
+        test_target = torch.where(seg_target2 == 6, 6 * torch.ones_like(test_target), test_target)
+        self.save_vis_mask(img_path1, img_path2, test_target.cpu(), self.save_dir, count='test_ninitial_target_seg')
+
 
         self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='0_erased_src_seg')
         self.save_vis_mask(img_path1, img_path2, new_target.cpu(), self.save_dir, count='0_initial_target_seg')
@@ -446,44 +273,60 @@ class Alignment():
                 mean_seg = warped_down_seg.squeeze().type(torch.ByteTensor)  # 512, 512 or 256, 256
                 self.save_vis_mask(img_path1, img_path2, mean_seg.cpu(),self.save_dir,count='1_warped_target_seg')
             
-            bald_target1 = torch.where(bald_target1 == 10, torch.zeros_like(bald_target1), bald_target1)  # hair 부분 제외한 나머지 segmap
-        
             M_hole = (1 - (1-hair_mask1) - hair_mask2).clamp(min=0)
             save_img = toPIL(((M_hole + 1) / 2).clamp(0, 1).squeeze().cpu())
             save_img.save(os.path.join(self.save_dir, "M_hole.png"))
-            
-            
-            bald_target1_face = torch.where((bald_target1 >= 1) & (bald_target1 <= 6), bald_target1, torch.zeros_like(bald_target1)) * 1.0
+        
+            bald_target1_face = torch.where((bald_target1 >= 1) & (bald_target1 <= 5), bald_target1, torch.zeros_like(bald_target1)) * 1.0
             masked_bald_down_seg = bald_target1_face* M_hole
             new_target = torch.where((new_target == 0) & M_hole.bool(), masked_bald_down_seg, new_target)
             self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='1st_target_seg')
-
-            if torch.any(seg_target2 == 14) :
-                new_target = torch.where((new_target == 0) & (seg_target2 == 14) & M_hole.bool(), seg_target2, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='2nd_target_seg')
-
-            if torch.any(bald_target1 == 14) :
-                new_target = torch.where((new_target == 0) & (bald_target1 == 14) & M_hole.bool(), bald_target1, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='3rd_target_seg')
             
-            if torch.any(seg_target2 == 15) :
-                new_target = torch.where((new_target == 0) & (seg_target2 == 15) & M_hole.bool(), seg_target2, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='4th_target_seg')
+            test_bald_target = torch.where(bald_target1 == 0, 13*torch.ones_like(bald_target1), bald_target1)
+            self.save_vis_mask(img_path1, img_path2, test_bald_target.cpu().squeeze(), self.save_dir, count='test_bald')
+            test_bald_target1_face = torch.where(((test_bald_target >= 1) & (test_bald_target <= 5)) | (test_bald_target == 13), test_bald_target, torch.zeros_like(test_bald_target)) * 1.0
+            test_masked_bald_down_seg = test_bald_target1_face* M_hole
+            self.save_vis_mask(img_path1, img_path2, test_masked_bald_down_seg.cpu().squeeze(), self.save_dir, count='test_bald_face')
+            test_target = torch.where(((test_target == 0) | (test_target == 13)) & M_hole.bool(), test_masked_bald_down_seg, test_target)
+            self.save_vis_mask(img_path1, img_path2, test_target.cpu().squeeze(), self.save_dir, count='test_1st_target_seg')
+            
+            if torch.any(bald_target1 == 14) : # 14 : neck
+                new_target = torch.where((new_target == 0) & (bald_target1 == 14) & M_hole.bool(), bald_target1, new_target)
+                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='2nd_target_seg')
+                test_target = torch.where(((test_target == 13) | (test_target==0)) & (bald_target1 == 14) & M_hole.bool(), bald_target1, test_target)
+                self.save_vis_mask(img_path1, img_path2, test_target.cpu().squeeze(), self.save_dir, count='test_2nd_target_seg')
+        
 
-            if torch.any(bald_target1 == 15) :
+            if torch.any(bald_target1 == 15) : # 15 : cloth
                 new_target = torch.where((new_target == 0) & (bald_target1 == 15) & M_hole.bool(), bald_target1, new_target)
-                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='5th_target_seg')
+                self.save_vis_mask(img_path1, img_path2, new_target.cpu().squeeze(), self.save_dir, count='3rd_target_seg')
+                test_target = torch.where(((test_target == 13) | (test_target==0)) & (bald_target1 == 15) & M_hole.bool(), bald_target1, test_target)
+                self.save_vis_mask(img_path1, img_path2, test_target.cpu().squeeze(), self.save_dir, count='test_3rd_target_seg')
+            
             
             inpaint_seg = torch.where(M_hole.bool(), new_target, torch.zeros_like(new_target))
-            self.save_vis_mask(img_path1, img_path2, inpaint_seg.cpu().squeeze(), self.save_dir, count='inpaint_target_seg')
+            self.save_vis_mask(img_path1, img_path2, inpaint_seg.cpu().squeeze(), self.save_dir, count='4th_inpaint_target_seg')
+            test_inpaint_seg = torch.where(M_hole.bool(), test_target, torch.zeros_like(test_target))
+            self.save_vis_mask(img_path1, img_path2, test_inpaint_seg.cpu().squeeze(), self.save_dir, count='test_4th_inpaint_target_seg')
             
-            new_target_mean_seg = torch.where((new_target == 0) * (seg_target2.to(self.opts.device) != 0), seg_target2.to(self.opts.device), new_target)  # 220213 edited by taeu
 
+            new_target_mean_seg = torch.where((new_target == 0) & ((seg_target2 >= 1) & (seg_target2 <= 6)), seg_target2.to(self.opts.device), new_target) # inpainting
+            
+            test_new_target_mean_seg = torch.where((test_target == 13) & ((seg_target2 >= 1) & (seg_target2 <= 6)), seg_target2.to(self.opts.device), test_target) # inpainting
+        
+            test_inpaint_seg = torch.where((test_target == 13) & (((seg_target2 >= 1) & (seg_target2 <= 6))), seg_target2, torch.zeros_like(test_target))
+            test_inpaint_seg = torch.where(seg_target2 == 10, 10*torch.ones_like(seg_target2), test_inpaint_seg)
+
+            self.save_vis_mask(img_path1, img_path2, test_inpaint_seg.cpu().squeeze(), self.save_dir, count='test_5th_inpaint_target_seg')
+
+            self.save_vis_mask(img_path1, img_path2, test_new_target_mean_seg.cpu().squeeze(), self.save_dir, count='test_target_seg')
+            
             target_mask = new_target_mean_seg.unsqueeze(0).long().to(self.opts.device)
+        
         else:
             target_mask = new_target.unsqueeze(0).long().to(self.opts.device)
 
-        self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(),self.save_dir, count='2_final_target_seg')
+        self.save_vis_mask(img_path1, img_path2, target_mask.squeeze().cpu(),self.save_dir, count='5th_final_target_seg')
         W_latent_path = os.path.join(self.save_dir, 'warped_latent_2')
         np.save(W_latent_path, warped_latent_2.detach().cpu().numpy())
 
@@ -496,9 +339,9 @@ class Alignment():
         
         if self.opts.optimize_warped_trg_mask:
             hair_mask2 = torch.where(seg_target2_temp == 10, torch.ones_like(seg_target2_temp), torch.zeros_like(seg_target2_temp))
-            return target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, warped_latent_2
+            return target_mask, seg_target2, hair_mask1, M_hole, bald_target1, warped_latent_2
         else:
-            return target_mask, seg_target2, hair_mask1, inpaint_seg, bald_target1, None
+            return target_mask, seg_target2, hair_mask1, M_hole, bald_target1, None
  
 
     def align_images(
