@@ -1,21 +1,20 @@
-import torch
-from torch import nn
-from .Net import Net
-import numpy as np
 import os
+import torch
+import numpy as np
+from torch import nn
 from functools import partial
-from src.utils.bicubic import BicubicDownSample
-
-from .face_parsing.model import BiSeNet, seg_mean, seg_std
-from src.datasets.image_dataset import ImagesDataset
-from src.losses.embedding_loss import EmbeddingLossBuilder
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
-# import torchvision
 import torchvision.transforms as transforms
-from ..utils.data_utils import convert_npy_code, load_image, load_latent_W
-from ..utils.model_utils import download_weight
+
+# Importing from local modules
+from .Net import Net
+from .face_parsing.model import BiSeNet, seg_mean, seg_std
+from src.utils.data_utils import load_latent_W
+from src.utils.model_utils import download_weight
+from src.utils.bicubic import BicubicDownSample
+from src.losses.embedding_loss import EmbeddingLossBuilder
+
 toPIL = transforms.ToPILImage()
 
 class Embedding(nn.Module):
@@ -35,7 +34,6 @@ class Embedding(nn.Module):
         else:
             self.net = net
         self.generator = self.net.generator
-        # self._load_image_transform()
         self.load_segmentmodel()
         self.load_downsampling()
         self.setup_embedding_loss_builder()
@@ -54,12 +52,10 @@ class Embedding(nn.Module):
             result = self.image_transform(im)
 
         return result.unsqueeze(0).to(device)
-
         
     def load_segmentmodel(self):
         self.seg = BiSeNet(n_classes=16)
         self.seg.to(self.opts.device)
-
 
         if not os.path.exists(self.opts.seg_ckpt):
             download_weight(self.opts.seg_ckpt)
@@ -74,7 +70,8 @@ class Embedding(nn.Module):
         self.downsample = BicubicDownSample(factor=self.opts.size // 256)
         self.downsample_512 = BicubicDownSample(factor=self.opts.size // 512)
         
-        
+    def setup_embedding_loss_builder(self):
+        self.loss_builder = EmbeddingLossBuilder(self.opts)
 
     def preprocess_img(self, img_path):
         if isinstance(img_path, str):
@@ -99,6 +96,19 @@ class Embedding(nn.Module):
         # 1, 512, 512
         return seg_target == target
 
+    def cal_loss(self, im_dict, latent_in, latent_F=None, F_init=None):
+        loss, loss_dic = self.loss_builder(**im_dict)
+        p_norm_loss = self.net.cal_p_norm_loss(latent_in)
+        loss_dic['p-norm'] = p_norm_loss
+        loss += p_norm_loss
+
+        if latent_F is not None and F_init is not None:
+            l_F = self.net.cal_l_F(latent_F, F_init)
+            loss_dic['l_F'] = l_F
+            loss += l_F
+
+        return loss, loss_dic 
+
     def setup_W_optimizer(self, init_latent=None):
         if init_latent is not None:
             if isinstance(init_latent, np.ndarray):
@@ -113,28 +123,20 @@ class Embedding(nn.Module):
             'adamax': torch.optim.Adamax
         }
         latent = []
-        if (self.opts.tile_latent):
-            tmp = self.net.latent_avg.clone().detach().cuda()
+        for i in range(self.net.layer_num):
+            if init_latent is None:
+                tmp = self.net.latent_avg.clone().detach().cuda()
+                print("제발로")
+            else:
+                tmp = init_latent[i, :]
             tmp.requires_grad = True
-            for i in range(self.net.layer_num):
-                latent.append(tmp)
-            optimizer_W = opt_dict[self.opts.opt_name]([tmp], lr=self.opts.learning_rate)
-        else:
-            for i in range(self.net.layer_num):
-                if init_latent is None:
-                    tmp = self.net.latent_avg.clone().detach().cuda()
-                else:
-                    tmp = init_latent[i, :]
-                tmp.requires_grad = True
-                latent.append(tmp)
-            optimizer_W = opt_dict[self.opts.opt_name](latent, lr=self.opts.learning_rate)
+            latent.append(tmp)
+
+        optimizer_W = opt_dict[self.opts.opt_name](latent, lr=self.opts.learning_rate)
 
         return optimizer_W, latent
 
-
-
     def setup_FS_optimizer(self, latent_W, F_init):
-
         latent_F = F_init.clone().detach().requires_grad_(True)
         latent_S = []
         opt_dict = {
@@ -158,88 +160,16 @@ class Embedding(nn.Module):
 
         return optimizer_FS, latent_F, latent_S
 
-
-
-
-    def setup_dataloader(self, image_path=None):
-
-        self.dataset = ImagesDataset(opts=self.opts,image_path=image_path)
-        self.dataloader = DataLoader(self.dataset, batch_size=1, shuffle=False)
-        print("Number of images: {}".format(len(self.dataset)))
-
-    def setup_embedding_loss_builder(self):
-        self.loss_builder = EmbeddingLossBuilder(self.opts)
-
-    def invert_images_in_W(self, image_path=None):
-        self.setup_dataloader(image_path=image_path)
-        device = self.opts.device
-        ibar = tqdm(self.dataloader, desc='Images')
-        for ref_im_H, ref_im_L, ref_name in ibar:
-            optimizer_W, latent = self.setup_W_optimizer()
-            pbar = tqdm(range(self.opts.W_steps), desc='Embedding', leave=False)
-            for step in pbar:
-                optimizer_W.zero_grad()
-                latent_in = torch.stack(latent).unsqueeze(0)
-
-                gen_im, _ = self.net.generator([latent_in], input_is_latent=True, return_latents=False)
-                im_dict = {
-                    'ref_im_H': ref_im_H.to(device),
-                    'ref_im_L': ref_im_L.to(device),
-                    'gen_im_H': gen_im,
-                    'gen_im_L': self.downsample(gen_im)
-                }
-
-                loss, loss_dic = self.cal_loss(im_dict, latent_in)
-                loss.backward()
-                optimizer_W.step()
-
-                if self.opts.verbose:
-                    pbar.set_description('Embedding: Loss: {:.3f}, L2 loss: {:.3f}, Perceptual loss: {:.3f}, P-norm loss: {:.3f}'
-                                         .format(loss, loss_dic['l2'], loss_dic['percep'], loss_dic['p-norm']))
-
-                if self.opts.save_intermediate and step % self.opts.save_interval== 0:
-                    self.save_W_intermediate_results(ref_name, gen_im, latent_in, step)
-
-            self.save_W_results(ref_name, gen_im, latent_in)
-
-    def invert_image_in_W(self, image_path, init_latent=None, pbar=None):
-        image = load_image(image_path)
+    def invert_image_in_W(self, image, init_latent=None, pbar=None):
         ref_im_H = self.image_transform(image)
+        save_im = toPIL(((ref_im_H+ 1) / 2).detach().cpu().clamp(0, 1))
+        save_im.save("test_w+.png")
+        print("왜저래")
         ref_im_L = self.image_transform_256(image)
         device = self.opts.device
         optimizer_W, latent = self.setup_W_optimizer(init_latent)
-        # pbar = tqdm(range(self.opts.W_steps), desc='Embedding', leave=False)
-        for step in range(self.opts.W_steps):
-            optimizer_W.zero_grad()
-            latent_in = torch.stack(latent).unsqueeze(0)
 
-            gen_im, _ = self.net.generator([latent_in], input_is_latent=True, return_latents=False)
-            im_dict = {
-                'ref_im_H': ref_im_H.to(device),
-                'ref_im_L': ref_im_L.to(device),
-                'gen_im_H': gen_im,
-                'gen_im_L': self.downsample(gen_im)
-            }
-
-            loss, _ = self.cal_loss(im_dict, latent_in)
-            loss.backward()
-            optimizer_W.step()
-            if pbar is not None:
-                pbar.progress(int(step / self.opts.W_steps * 100), text=f'Embedding to W+ space ({step} / {self.opts.W_steps})')
-        if pbar is not None:
-            pbar.empty()
-        return gen_im.detach().clone(), latent_in.detach().clone()
-
-
-    def invert_image_in_W_without_path(self, image, init_latent=None, pbar=None, iter=100):
-        ref_im_H = self.image_transform(image)
-        ref_im_L = self.image_transform_256(image)
-        device = self.opts.device
-        optimizer_W, latent = self.setup_W_optimizer(init_latent)
-        if pbar is None:
-            pbar = tqdm(range(iter), desc='Embedding', leave=False)
-        else:
-            pbar.reset(total=self.opts.W_steps)
+        pbar = tqdm(range(self.opts.W_steps), desc='W+ Embedding', leave=False)
         for step in pbar:
             optimizer_W.zero_grad()
             latent_in = torch.stack(latent).unsqueeze(0)
@@ -256,68 +186,30 @@ class Embedding(nn.Module):
             loss.backward()
             optimizer_W.step()
             pbar.set_postfix(step=step, loss=loss.item())
+        print("저장햇냐?")
+        save_im = toPIL(((gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
+        save_im.save("test_w+.png")
 
-        pbar.close()
-        return gen_im.detach().clone(), latent_in.detach().clone()
+        return gen_im.detach().clone(), latent_in.detach().clone() # Return loss values and intermediate latents
 
-
-    def invert_images_in_FS(self, image_path=None):
-        self.setup_dataloader(image_path=image_path)
-        output_dir = self.opts.output_dir
-        device = self.opts.device
-        ibar = tqdm(self.dataloader, desc='Images')
-        for ref_im_H, ref_im_L, ref_name in ibar:
-
-            latent_W_path = os.path.join(output_dir, 'W+', f'{ref_name[0]}.npy')
-            latent_W = torch.from_numpy(convert_npy_code(np.load(latent_W_path))).to(device)
-            F_init, _ = self.net.generator([latent_W], input_is_latent=True, return_latents=False, start_layer=0, end_layer=3)
-            optimizer_FS, latent_F, latent_S = self.setup_FS_optimizer(latent_W, F_init)
-
-
-            pbar = tqdm(range(self.opts.FS_steps), desc='Embedding', leave=False)
-            for step in pbar:
-
-                optimizer_FS.zero_grad()
-                latent_in = torch.stack(latent_S).unsqueeze(0)
-                gen_im, _ = self.net.generator([latent_in], input_is_latent=True, return_latents=False,
-                                               start_layer=4, end_layer=8, layer_in=latent_F)
-                im_dict = {
-                    'ref_im_H': ref_im_H.to(device),
-                    'ref_im_L': ref_im_L.to(device),
-                    'gen_im_H': gen_im,
-                    'gen_im_L': self.downsample(gen_im)
-                }
-
-                loss, loss_dic = self.cal_loss(im_dict, latent_in)
-                loss.backward()
-                optimizer_FS.step()
-
-                if self.opts.verbose:
-                    pbar.set_description(
-                        'Embedding: Loss: {:.3f}, L2 loss: {:.3f}, Perceptual loss: {:.3f}, P-norm loss: {:.3f}, L_F loss: {:.3f}'
-                        .format(loss, loss_dic['l2'], loss_dic['percep'], loss_dic['p-norm'], loss_dic['l_F']))
-
-            self.save_FS_results(ref_name, gen_im, latent_in, latent_F)
-
-    def invert_image_in_FS(self, image_path, W_init=None, F_init = None, pbar=None):
-        image = load_image(image_path)
-
-        device = self.opts.device
-        
+    def invert_image_in_FS(self, image, W_init=None, F_init=None, pbar=None, text = '', max_steps=700):    
         ref_im_H = self.image_transform(image)
         ref_im_L = self.image_transform_256(image)
 
+        device =self.opts.device 
+
         if W_init is None:
-            _, latent_W = self.invert_image_in_W(image_path, pbar=pbar)
+            _, latent_W = self.invert_image_in_W(image, pbar=pbar)
         else:
-            latent_W = load_latent_W(W_init, device=device)
+            latent_W = W_init.clone()
         
         if F_init is None:
             F_init, _ = self.net.generator([latent_W], input_is_latent=True, return_latents=False, start_layer=0, end_layer=3)
 
         optimizer_FS, latent_F, latent_S = self.setup_FS_optimizer(latent_W, F_init)
-        import streamlit as st
-        for step in range(self.opts.FS_steps):
+
+        pbar = tqdm(range(max_steps), desc='FS Embedding', leave=False)
+        for step in pbar:
             optimizer_FS.zero_grad()
             latent_in = torch.stack(latent_S).unsqueeze(0)
             gen_im, _ = self.net.generator([latent_in], input_is_latent=True, return_latents=False,
@@ -332,30 +224,9 @@ class Embedding(nn.Module):
             loss, _ = self.cal_loss(im_dict, latent_in)
             loss.backward()
             optimizer_FS.step()
-            # if step % 20 == 0:
-            #     st.image(
-            #         self.tensor_to_pil(gen_im)
-            #     )
-        #     if pbar is not None:
-        #         pbar.progress(int(step / self.opts.FS_steps * 100), text=f'Embedding to FS space ({step} / {self.opts.FS_steps})')
-        # if pbar is not None:
-        #     pbar.empty()
-        return gen_im.detach().clone(), latent_in.detach().clone(), latent_F.detach().clone()
+            pbar.set_postfix(step=step, loss=loss.item())
 
-    def cal_loss(self, im_dict, latent_in, latent_F=None, F_init=None):
-        loss, loss_dic = self.loss_builder(**im_dict)
-        p_norm_loss = self.net.cal_p_norm_loss(latent_in)
-        loss_dic['p-norm'] = p_norm_loss
-        loss += p_norm_loss
-
-        if latent_F is not None and F_init is not None:
-            l_F = self.net.cal_l_F(latent_F, F_init)
-            loss_dic['l_F'] = l_F
-            loss += l_F
-
-        return loss, loss_dic
-
-
+        return gen_im.detach().clone(), latent_in.detach().clone(), latent_F.detach().clone() # Return both loss values
 
     def save_W_results(self, ref_name, gen_im, latent_in):
         save_im = toPIL(((gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
@@ -369,8 +240,6 @@ class Embedding(nn.Module):
 
         save_im.save(image_path)
         np.save(latent_path, save_latent)
-
-
 
     def save_W_intermediate_results(self, ref_name, gen_im, latent_in, step):
 
@@ -387,7 +256,6 @@ class Embedding(nn.Module):
         save_im.save(image_path)
         np.save(latent_path, save_latent)
 
-
     def save_FS_results(self, ref_name, gen_im, latent_in, latent_F):
 
         save_im = toPIL(((gen_im[0] + 1) / 2).detach().cpu().clamp(0, 1))
@@ -402,92 +270,9 @@ class Embedding(nn.Module):
         np.savez(latent_path, latent_in=latent_in.detach().cpu().numpy(),
                  latent_F=latent_F.detach().cpu().numpy())
 
-
-    def set_seed(self):
-        if self.opt.seed:
-            torch.manual_seed(self.opt.seed)
-            torch.cuda.manual_seed(self.opt.seed)
-            torch.backends.cudnn.deterministic = True
-
     def tensor_to_pil(self, gen_im):
         return toPIL(((gen_im.squeeze() + 1) / 2).detach().cpu().clamp(0, 1))
     
     def tensor_to_numpy(self, gen_im):
         return np.array(self.tensor_to_pil(gen_im))
     
-    def eval_images(
-        self, 
-        target_im, 
-        hair_im, 
-        face_im, 
-        hair_mask=None, 
-        face_mask=None, 
-        return_mask = False, 
-        **kargv,
-    ):
-        # target_H, target_L = load_image(target_im)
-        # face_H, face_L = load_image(face_im)
-        # hair_H, hair_L = load_image(hair_im)
-        
-        if hair_mask is None:
-            hair_mask = self.get_seg(target_im).unsqueeze(0).float()
-            print(f"hair_mask: {hair_mask.shape}")
-            hair_mask_H = nn.functional.interpolate(hair_mask, size=(1024, 1024), mode='nearest')
-            hair_mask_L = nn.functional.interpolate(hair_mask, size=(256, 256), mode='nearest')
-        if face_mask is None:
-            face_mask = 1 - self.get_seg(face_im).unsqueeze(0).float()
-            face_mask_H = nn.functional.interpolate(face_mask, size=(1024, 1024), mode='nearest')
-            face_mask_L = nn.functional.interpolate(face_mask, size=(256, 256), mode='nearest')
-            
-        # if isinstance(hair_mask, np.ndarray):
-        #     hair_mask = torch.from_numpy(hair_mask).to(self.device)
-        # if len(hair_mask.shape) == 2:
-        #     hair_mask = hair_mask.unsqueeze(0).unsqueeze(0)#.clone().detach()
-        # elif len(hair_mask.shape) == 1:
-        #     hair_mask = hair_mask.unsqueeze(0)
-        # hair_mask[hair_mask>0] = 1
-        # hair_mask_256 = nn.functional.interpolate(hair_mask, size=(256, 256), mode='nearest')
-        
-        # if face_mask is not None:
-        #     if isinstance(face_mask, np.ndarray):
-        #         face_mask = torch.from_numpy(face_mask).to(self.device)
-        #     if len(face_mask.shape) == 2:
-        #         face_mask = face_mask.unsqueeze(0).unsqueeze(0)#.clone().detach()
-        #     elif len(face_mask.shape) == 1:
-        #         face_mask = face_mask.unsqueeze(0)
-        #     face_mask[face_mask>0] = 1
-        #     face_mask_256 = nn.functional.interpolate(face_mask, size=(256, 256), mode='nearest')
-        
-        mask_dict = {
-            'hair_H': hair_mask_H, 
-            'hair_L': hair_mask_L, 
-            'face_H': face_mask_H, 
-            'face_L': face_mask_L, 
-        }
-        ref_dict = {
-            'hair_H': hair_H, 
-            'hair_L': hair_L, 
-            'face_H': face_H, 
-            'face_L': face_L, 
-        }
-        
-        score_dict = {}
-        for target in ['hair', 'face']:
-            mask_ = mask_dict[f"{target}_H"]
-            mask_256_ = mask_dict[f"{target}_L"]
-            ref_H = ref_dict[f"{target}_H"]
-            ref_L = ref_dict[f"{target}_L"]
-            for loss_name, score_fn in self.loss_dict.items():
-                if loss_name == 'l2':
-                    score = score_fn(target_H, ref_H, mask_).sum()
-                elif loss_name in ['psnr', 'ssim']:
-                    score = score_fn(target_H, ref_H, mask_)
-                else:
-                    score = score_fn(target_L, ref_L, mask_256_, mask_256_)
-                
-                if isinstance(score, torch.Tensor):
-                    score = score.item()
-                score_dict[f"{target}_{loss_name}"] = score
-        if return_mask:
-            return score_dict, hair_mask.detach().squeeze().cpu().numpy(), face_mask.detach().squeeze().cpu().numpy()
-        return score_dict

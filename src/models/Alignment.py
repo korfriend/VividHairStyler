@@ -188,15 +188,19 @@ class Alignment():
             latent_W_bald, 
             is_downsampled=True,
             ) :
+        
+        ###### Get segmentation mask from img1, img2, img1_bald, img2_warped
+        # img1
         im1 = self.preprocess_img(img_path1)
         down_seg, _, _ = self.seg(im1)
         seg_target1 = torch.argmax(down_seg, dim=1).long()
 
+        # img2
         im2 = self.preprocess_img(img_path2)
         down_seg2, _, _ = self.seg(im2)
-        seg_target2 = torch.argmax(down_seg2, dim=1).long()
-        seg_target2_temp = seg_target2.clone()
+        seg_target2_temp = torch.argmax(down_seg2, dim=1).long()
 
+        # img1_bald
         G_bald, _ = self.generator([latent_W_bald], input_is_latent=True, return_latents=False,
                                         start_layer=0, end_layer=8)
         G_bald_0_1 = (G_bald + 1) / 2
@@ -207,12 +211,7 @@ class Alignment():
         bald_target1 = torch.where(bald_target1 == 10, torch.zeros_like(bald_target1), bald_target1)  # hair 부분 제외한 나머지 segmap
         self.save_vis_mask(img_path1, img_path2, bald_target1.cpu().squeeze(), self.save_dir, count='0_bald_seg')
 
-        hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  # 10 : hair
-        seg_target1 = seg_target1[0].byte()
-        test_seg_target1 = seg_target1.clone()
-        seg_target1 = torch.where(seg_target1 == 12, torch.zeros_like(seg_target1), seg_target1)  # earing 부분 제외한 나머지 segmap      
-        seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap
-        
+        # img2_warped
         if self.opts.optimize_warped_trg_mask:
             im1_for_kp = F.interpolate(im1, size=(256, 256))
             im1_for_kp = ((im1_for_kp + 1) / 2).clamp(0, 1)  # [0, 1] 사이로
@@ -227,11 +226,18 @@ class Alignment():
             else:
                 seg_target2 = torch.argmax(warped_down_seg, dim=1).long()
             warped_down_seg = torch.argmax(warped_down_seg.clone().detach(), dim=1).long()  # 512, 512
-
-        hair_mask2 = torch.where(seg_target2 == 10, torch.ones_like(seg_target2), torch.zeros_like(seg_target2))
-        seg_target2 = seg_target2[0].byte()
         
-        ##########
+        ###### 
+        hair_mask1 = torch.where(seg_target1 == 10, torch.ones_like(seg_target1), torch.zeros_like(seg_target1))  
+        hair_mask2 = torch.where(seg_target2 == 10, torch.ones_like(seg_target2), torch.zeros_like(seg_target2))
+
+        seg_target1 = seg_target1[0].byte()
+        seg_target2 = seg_target2[0].byte()
+        test_seg_target1 = seg_target1.clone() # (test)
+
+        seg_target1 = torch.where(seg_target1 == 12, torch.zeros_like(seg_target1), seg_target1)  # earing 부분 제외한 나머지 segmap      
+        seg_target1 = torch.where(seg_target1 == 10, torch.zeros_like(seg_target1), seg_target1)  # hair 부분 제외한 나머지 segmap
+
         new_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(seg_target1), seg_target1) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
         new_target = torch.where(seg_target2 == 6, 6 * torch.ones_like(new_target), new_target)
 
@@ -239,6 +245,7 @@ class Alignment():
         test_target = torch.where(test_seg_target1 == 0, 13*torch.ones_like(test_seg_target1), test_seg_target1)
         test_target = torch.where(test_seg_target1 == 12, torch.zeros_like(test_seg_target1), test_target)  # earing 부분 제외한 나머지 segmap      
         test_target = torch.where(test_seg_target1 == 10, torch.zeros_like(test_seg_target1), test_target)  # hair 부분 제외한 나머지 segmap
+        test_target = torch.where(seg_target2 == 10, torch.zeros_like(test_seg_target1), test_target)
         
         self.save_vis_mask(img_path1, img_path2, test_target.cpu(), self.save_dir, count='test_erased_src_seg')
 
@@ -249,7 +256,7 @@ class Alignment():
 
         test_target = torch.where(seg_target2 == 10, 10 * torch.ones_like(test_target), test_target) # put target hair on the target seg 1 (Here, seg_target1 has no hair region)
         test_target = torch.where(seg_target2 == 6, 6 * torch.ones_like(test_target), test_target)
-        self.save_vis_mask(img_path1, img_path2, test_target.cpu(), self.save_dir, count='test_ninitial_target_seg')
+        self.save_vis_mask(img_path1, img_path2, test_target.cpu(), self.save_dir, count='test_initial_target_seg')
 
 
         self.save_vis_mask(img_path1, img_path2, seg_target1.cpu(), self.save_dir, count='0_erased_src_seg')

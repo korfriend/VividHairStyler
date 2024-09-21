@@ -31,15 +31,7 @@ from src.models.Blending import Blending
 from src.losses.blend_loss import BlendLossBuilder
 from src.mapper.Bald import Bald
 
-def reset_seed(seed):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-seed = 8800
-reset_seed(seed)
+from src.models.Embedding_2 import invert_image_in_W, invert_image_in_FS
 
 #region Configurations and Constants
 args = parse_yaml('opts/config.yml')
@@ -143,9 +135,11 @@ def cache_embedding(img, encoder, ii2s):
     # _, W_init = ii2s.invert_image_in_W(img)
     # embedd_progress.progress(60, text=f"Embedding in progress... ")
     pil_image = Image.fromarray(img)
-    gen_im, latent_S, latent_F = ii2s.invert_image_in_FS(img)
+    gen_im, latent_S, latent_F = invert_image_in_FS(pil_image, text='FS_space_embedding', pbar=None)
     embedd_progress.progress(100, text=f"Embedding in progress... ")
     embedd_progress.empty()
+    Image.fromarray(ii2s.tensor_to_numpy(gen_im)).save(os.path.join(output_dir, "test.png"))
+
     return gen_im, latent_S, latent_F
 
 def display_image_with_caption(columns, filepaths, captions, keys, indices):
@@ -216,7 +210,7 @@ def process_image(img, key):
     np.savez(latent_dir, latent_in=latent_S.detach().cpu().numpy(), latent_F=latent_F.detach().cpu().numpy())
     return img, latent_S, latent_F
 
-def run_embedding(img,key, i) :
+def run_image_embedding(img, key, i):
     img, latent_S, latent_F = process_image(img, key)
     st.session_state.images[i] = img
     st.session_state.latents[i] = latent_S
@@ -238,16 +232,17 @@ torch.cuda.empty_cache()
 model_progress = st.progress(0, text="Loading models...")
 model_progress.progress(50, text="Loading models...")
 
-if 'net' not in st.session_state or 'ii2s' not in st.session_state or 'encoder' not in st.session_state:
+if 'net' not in st.session_state or 'encoder' not in st.session_state:
     net, ii2s, encoder = initialize_model(args)
     st.session_state.net = net
-    st.session_state.ii2s = ii2s
+    # st.session_state.ii2s = ii2s
     st.session_state.encoder = encoder
 else:
     net = st.session_state.net
-    ii2s = st.session_state.ii2s
+    # ii2s = ii2s
     encoder = st.session_state.encoder
 
+ii2s = Embedding(args, net=net)
 model_progress.progress(100, text="Loading models...")
 model_progress.empty()
 
@@ -281,18 +276,18 @@ for i, (col, filepath, key, index) in enumerate(zip(st.columns(3), [filepath_lis
 
     if uploaded_image is not None and f'{uploaded_image.name}' != st.session_state.selected_filenames[i]:
         img = np.array(Image.open(uploaded_image))
-        run_embedding(img, key, i)
+        run_image_embedding(img, key, i)
         st.session_state.selected_filenames[i] = f'{uploaded_image.name}'
         
     elif text != "" and text != st.session_state.selected_filenames[i]:
         img = text_to_image(text)
-        run_embedding(img, key, i)
+        run_image_embedding(img, key, i)
         st.session_state.selected_filenames[i] = text
-        
+
     elif uploaded_image is None and text == "" and selected_filename != st.session_state.selected_filenames[i]:
         img_path = os.path.join(ffhq_dir, selected_filename)
         img = BGR2RGB(img_path)
-        run_embedding(img, key, i)
+        run_image_embedding(img, key, i)
         st.session_state.selected_filenames[i] = selected_filename
 
     img_placeholder.image(st.session_state.images[i])
@@ -310,6 +305,7 @@ M_aref = get_mask_dict(im=images[2], mask=None, embedding=ii2s)
 W_src, F7_src = latents[0].clone(), Fs[0].clone()
 W_sref, F7_sref = latents[1].clone(), Fs[1].clone()
 W_aref, F7_aref = latents[2].clone(), Fs[2].clone()
+
 bald_module = Bald(args.bald_model_path)
 W_src_bald = bald_module.make_bald(W_src)
 del bald_module
