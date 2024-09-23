@@ -392,8 +392,6 @@ if not run_opt and not sketch_completed:
 align = Alignment(args, embedding=ii2s)
 
 if run_opt:
-
-
     I_1 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_src_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
     I_3 = transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])(transforms.ToTensor()(Image.fromarray(I_aref_rgb).resize((256, 256), Image.LANCZOS))).to(device).unsqueeze(0)
 
@@ -619,7 +617,7 @@ if interpolation_latent is not None :
         style_loss = loss_builder.style_loss(H2_region, H1_region, im_dict['mask_hair'], im_dict['mask_2_hair'])
         hair_loss = loss_builder._loss_hair_percept(blend.downsample_256(I_G_color), im_dict['im_3'], im_dict['mask_hair'])
 
-        total_loss += face_loss + hair_loss + 10000 * style_loss
+        total_loss += face_loss + hair_loss + 20000 * style_loss
         opt_blend.zero_grad()
         total_loss.backward(retain_graph=True)
         opt_blend.step()
