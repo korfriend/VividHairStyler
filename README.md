@@ -1,4 +1,4 @@
-# StyleHairEdit: StyleHairEdit: High-Fidelity Hair Transfer and Editing via Refined Mask Completion and Vibrant Appearance Representation
+# StyleHairEdit: High-Fidelity Hair Transfer and Editing via Refined Mask Completion and Vibrant Appearance Representation
 <p align="center">
   <img src="docs/assets/teasor_1refs.jpg" alt="teaser">
   <img src="docs/assets/teasor_2refs.jpg" alt="teaser">
