@@ -192,6 +192,7 @@ class Embedding(nn.Module):
                 loss, loss_dic = self.cal_loss(im_dict, latent_in)
                 loss.backward()
                 optimizer_W.step()
+                
 
                 if self.opts.verbose:
                     pbar.set_description('Embedding: Loss: {:.3f}, L2 loss: {:.3f}, Perceptual loss: {:.3f}, P-norm loss: {:.3f}'
@@ -208,8 +209,8 @@ class Embedding(nn.Module):
         ref_im_L = self.image_transform_256(image)
         device = self.opts.device
         optimizer_W, latent = self.setup_W_optimizer(init_latent)
-        # pbar = tqdm(range(self.opts.W_steps), desc='Embedding', leave=False)
-        for step in range(self.opts.W_steps):
+        pbar = tqdm(range(self.opts.W_steps), desc='Embedding_W+', leave=False)
+        for step in pbar:
             optimizer_W.zero_grad()
             latent_in = torch.stack(latent).unsqueeze(0)
 
@@ -224,10 +225,9 @@ class Embedding(nn.Module):
             loss, _ = self.cal_loss(im_dict, latent_in)
             loss.backward()
             optimizer_W.step()
-            if pbar is not None:
-                pbar.progress(int(step / self.opts.W_steps * 100), text=f'Embedding to W+ space ({step} / {self.opts.W_steps})')
-        if pbar is not None:
-            pbar.empty()
+            pbar.set_postfix(step=step, loss=loss.item())
+
+        
         return gen_im.detach().clone(), latent_in.detach().clone()
 
 
@@ -316,8 +316,12 @@ class Embedding(nn.Module):
             F_init, _ = self.net.generator([latent_W], input_is_latent=True, return_latents=False, start_layer=0, end_layer=3)
 
         optimizer_FS, latent_F, latent_S = self.setup_FS_optimizer(latent_W, F_init)
-        import streamlit as st
-        for step in range(self.opts.FS_steps):
+        
+        if pbar is None:
+            pbar = tqdm(range(self.opts.FS_steps), desc='Embedding_FS', leave=False)
+        else:
+            pbar.reset(total=self.opts.W_steps)
+        for step in pbar:
             optimizer_FS.zero_grad()
             latent_in = torch.stack(latent_S).unsqueeze(0)
             gen_im, _ = self.net.generator([latent_in], input_is_latent=True, return_latents=False,
@@ -332,14 +336,13 @@ class Embedding(nn.Module):
             loss, _ = self.cal_loss(im_dict, latent_in)
             loss.backward()
             optimizer_FS.step()
+            pbar.set_postfix(step=step, loss=loss.item())
             # if step % 20 == 0:
             #     st.image(
             #         self.tensor_to_pil(gen_im)
             #     )
-            if pbar is not None:
-                pbar.progress(int(step / self.opts.FS_steps * 100), text=f'Embedding to FS space ({step} / {self.opts.FS_steps})')
-        if pbar is not None:
-            pbar.empty()
+            
+        pbar.close()
         return gen_im.detach().clone(), latent_in.detach().clone(), latent_F.detach().clone()
 
     def cal_loss(self, im_dict, latent_in, latent_F=None, F_init=None):

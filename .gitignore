@@ -4,6 +4,9 @@ __pycache__/
 /Output
 /logs
 *.pth
+/test
+.npz
+.npy
 
 # Dataset
 /test_data
